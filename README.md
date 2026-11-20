@@ -1,32 +1,50 @@
-# React + TypeScript + Vite
+# Liste de courses
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Petite application web de liste de courses (projet B3) en **React + TypeScript**, qui utilise
+l'API publique [DummyJSON](https://dummyjson.com) comme catalogue de produits.
+Déployée sur **Red Hat OpenShift** (Developer Sandbox).
 
-Currently, two official plugins are available:
+- On choisit un produit dans le catalogue (catégorie *groceries* de DummyJSON) et on l'ajoute.
+- Ajouter un produit déjà présent augmente sa quantité de 1.
+- On peut supprimer une ligne de la liste.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Les règles exactes sont dans [`SPEC.md`](SPEC.md) (R1 à R24).
 
-## React Compiler
+## Limites (voulues)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+DummyJSON **simule** les ajouts et les suppressions : rien n'est enregistré sur le serveur.
+La liste vit dans la mémoire de React et redevient vide quand on recharge la page.
 
-## Expanding the Oxlint configuration
+## Lancer en local
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev        # http://localhost:5173
+npm test           # tests Vitest (un ou plusieurs par règle de SPEC.md)
+npm run build      # construit le site dans dist/
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Structure
+
+| Fichier | Rôle |
+| --- | --- |
+| `src/api.ts` | Les appels à DummyJSON (catalogue, ajout, suppression) |
+| `src/list.ts` | Les règles de la liste (ajouter / quantité / supprimer), en fonctions pures |
+| `src/App.tsx` | L'interface : menu du catalogue, liste, messages |
+| `src/types.ts` | Les types `Product` et `ListItem` |
+| `*.test.ts(x)`, `tests/` | Les tests |
+| `Dockerfile` | Image du conteneur : build Node puis nginx non-root sur le port 8080 |
+
+## Déployer sur OpenShift
+
+Après `oc login` (commande copiée depuis la console web du sandbox) :
+
+```bash
+# OpenShift récupère le code sur GitHub et construit l'image avec le Dockerfile
+oc new-app https://github.com/SinfulDice/b3-liste-de-courses --strategy=docker --name=liste-de-courses
+oc logs -f bc/liste-de-courses                                     # suivre le build
+oc create route edge liste-de-courses --service=liste-de-courses   # adresse publique en HTTPS
+oc get route liste-de-courses                                      # afficher l'adresse
+```
+
+Après un nouveau `git push` : `oc start-build liste-de-courses --follow`.
