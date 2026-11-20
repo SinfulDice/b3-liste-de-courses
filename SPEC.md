@@ -67,7 +67,8 @@ et des catégories sont en anglais, les prix en dollars.
 
 - **R43** : le sélecteur de quantité est `[−] [ X ] [+]` : un nombre entier entre **1 et 99**, 1 par défaut.
   « − » est désactivé à 1, « + » à 99. Si on tape une valeur invalide (vide, 0, lettres, > 99), elle est
-  ramenée entre 1 et 99 quand on quitte le champ.
+  ramenée entre 1 et 99 quand on quitte le champ. Après un ajout ou un retrait réussi, X revient à 1
+  (évite d'ajouter 2 MacBook par erreur au produit suivant).
 
 ## Ajouter
 

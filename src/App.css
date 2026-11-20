@@ -64,6 +64,7 @@ button:disabled {
 }
 
 .empty {
+  background: var(--card); /* opaque : les licornes du fond ne passent pas à travers le texte */
   color: var(--muted);
   text-align: center;
   padding: 24px;
@@ -81,27 +82,172 @@ button:disabled {
   gap: 8px;
 }
 
-.list li {
-  display: flex;
-  justify-content: space-between; /* nom à gauche, bouton à droite */
-  align-items: center;
-  gap: 8px;
+/* R6 : une ligne = image | infos | actions. "grid" place les morceaux sur une grille. */
+.line {
+  display: grid;
+  grid-template-columns: 56px 1fr; /* colonne image fixe, le reste prend la place */
+  grid-template-areas:
+    'img info'
+    'img actions';
+  gap: 6px 12px;
   padding: 10px 12px;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 8px;
 }
 
-.list li button {
-  background: transparent;
-  color: var(--danger);
-  border: 1px solid currentColor;
+.line-img {
+  grid-area: img;
+  width: 56px;
+  height: 56px;
+  object-fit: cover; /* l'image remplit le carré sans être déformée */
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.line-info {
+  grid-area: info;
+  min-width: 0;
+}
+
+.line-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.line-check input {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+}
+
+.line-price {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.line-price strong {
+  color: var(--text);
+}
+
+.line-actions {
+  grid-area: actions;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.line-actions button {
   padding: 6px 12px;
   font-size: 0.9rem;
 }
 
-.list li button:hover:not(:disabled) {
+/* R48 : ligne achetée -> nom barré, ligne plus pâle. */
+.line--bought {
+  opacity: 0.65;
+}
+
+.line--bought .line-name {
+  text-decoration: line-through;
+}
+
+/* Bouton rouge « Retirer ». */
+.btn-danger {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid currentColor;
+}
+
+.btn-danger:hover:not(:disabled) {
   background: var(--danger-bg);
+}
+
+/* R43 : [−] [X] [+] collés les uns aux autres. */
+.qty {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.qty .qty-btn {
+  width: 34px;
+  padding: 0;
+  font-size: 1.1rem;
+  border-radius: 0;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.qty .qty-btn:first-child {
+  border-radius: 8px 0 0 8px;
+}
+
+.qty .qty-btn:last-child {
+  border-radius: 0 8px 8px 0;
+}
+
+.qty .qty-btn:hover:not(:disabled) {
+  background: var(--border);
+}
+
+.qty-input {
+  width: 44px;
+  text-align: center;
+  font-size: 1rem;
+  border: 1px solid var(--border);
+  border-left: none;
+  border-right: none;
+  background: var(--card);
+  color: var(--text);
+}
+
+.section-title {
+  margin: 24px 0 8px;
+  font-size: 1.1rem;
+  color: var(--muted);
+}
+
+/* R46 : le récapitulatif. */
+.summary {
+  margin: 20px 0 0;
+  padding: 12px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.summary div {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.summary dt {
+  color: var(--muted);
+}
+
+.summary dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums; /* chiffres de même largeur : les montants s'alignent */
+}
+
+.summary-remaining {
+  margin-top: 6px;
+  padding-top: 10px !important;
+  border-top: 1px solid var(--border);
+  font-size: 1.15rem;
+}
+
+.summary-remaining dt {
+  color: var(--text);
+  font-weight: 700;
 }
 
 /* R57 : l'interrupteur « Noms en français ». */

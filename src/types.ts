@@ -7,7 +7,8 @@ export type Product = {
   category: string // "slug" anglais, ex : "groceries"
 }
 
-// Une ligne de MA liste de courses : un produit + combien j'en veux.
+// Une ligne d'une liste de courses : le produit + combien j'en veux + déjà acheté ou non.
 export type ListItem = Product & {
   quantity: number
+  bought: boolean // R48
 }
