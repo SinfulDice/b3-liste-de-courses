@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { NavLink, Navigate, Route, Routes } from 'react-router'
 import { addProduct, deleteProduct, fetchCatalog } from './api'
 import { CartUnicorn, type CartRide } from './CartUnicorn'
 import { productName } from './i18n/translate'
-import { addToList, isInList, removeQuantity, removesWholeLine, toggleBought } from './list'
-import { QuantityPicker } from './QuantityPicker'
-import { ShoppingList } from './ShoppingList'
+import { ListPage } from './ListPage'
+import { addToList, computeTotals, isInList, removeQuantity, removesWholeLine, toggleBought } from './list'
+import { ProductsPage } from './ProductsPage'
 import { playNeigh } from './sound'
 import { isBoolean, loadValue, saveValue } from './storage'
 import type { ListItem, Product } from './types'
@@ -17,13 +18,14 @@ export const CART_RIDE_MS = 4000
 // État du chargement du catalogue : en cours, raté ou prêt.
 type CatalogStatus = 'loading' | 'error' | 'ready'
 
+// Nom de la liste (une seule pour l'instant ; plusieurs listes à l'étape 4).
+const LIST_NAME = 'Ma liste'
+
 function App() {
   // useState garde une valeur entre deux affichages ; quand on la change, React réaffiche.
   const [catalog, setCatalog] = useState<Product[]>([])
   const [status, setStatus] = useState<CatalogStatus>('loading')
   const [items, setItems] = useState<ListItem[]>([]) // R5 : commence vide
-  const [selectedId, setSelectedId] = useState('') // '' = aucun produit choisi
-  const [quantity, setQuantity] = useState(1) // R43 : le X du formulaire d'ajout
   const [busy, setBusy] = useState(false) // R18 : un appel à l'API est en cours
   const [error, setError] = useState<string | null>(null)
   const [rides, setRides] = useState<CartRide[]>([]) // licornes au caddie en train de passer
@@ -126,79 +128,92 @@ function App() {
     }
   }
 
-  async function handleAddFromForm(event: FormEvent) {
-    event.preventDefault() // empêche le formulaire de recharger la page
-    const product = catalog.find((p) => String(p.id) === selectedId)
-    if (!product) return // R8 : rien de choisi -> rien ne se passe
-    if (await addQuantity(product, quantity)) setQuantity(1) // R43 : X revient à 1 après un ajout réussi
-  }
+  const itemCount = computeTotals(items).count // R36
 
   return (
     // <> … </> = un "fragment" : regroupe plusieurs éléments sans ajouter de balise dans la page.
     <>
       <UnicornSky />
-      <main className="app">
-        <h1>Liste de courses</h1>
-
-        {/* R57 : interrupteur de traduction. role="switch" dit aux lecteurs d'écran
-            que c'est un interrupteur marche/arrêt, pas une simple case à cocher. */}
-        <label className="toggle">
-          <input
-            type="checkbox"
-            role="switch"
-            checked={french}
-            onChange={(event) => setFrench(event.target.checked)}
-          />
-          Noms en français
-        </label>
-
-        {status === 'loading' && <p>Chargement…</p>}
-
-        {status === 'error' && (
-          <p className="error" role="alert">
-            Impossible de charger le catalogue. Vérifie ta connexion puis recharge la page.
-          </p>
-        )}
-
-        {status === 'ready' && (
-          <>
-            <form className="add-form" onSubmit={handleAddFromForm} aria-label="Ajouter un produit">
-              <label htmlFor="product">Produit</label>
-              <select
-                id="product"
-                value={selectedId}
-                onChange={(event) => setSelectedId(event.target.value)}
-              >
-                <option value="">— Choisir un produit —</option>
-                {catalog.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {productName(product, french)}
-                  </option>
-                ))}
-              </select>
-              <QuantityPicker value={quantity} onChange={setQuantity} label="Quantité à ajouter" />
-              <button type="submit" disabled={busy}>
-                Ajouter
-              </button>
-            </form>
-
-            {error && (
-              <p className="error" role="alert">
-                {error}
-              </p>
-            )}
-
-            <ShoppingList
-              items={items}
-              french={french}
-              busy={busy}
-              onAdd={(item, amount) => addQuantity(item, amount)}
-              onRemove={(item, amount) => removeAmount(item, amount)}
-              onToggleBought={(item) => setItems((current) => toggleBought(current, item.id))}
+      <div className="app">
+        {/* En-tête commun aux deux pages (R35, R57). */}
+        <header className="header">
+          <h1>Liste de courses</h1>
+          {/* R35 : NavLink = un lien qui sait s'il pointe vers la page actuelle : il reçoit alors
+              aria-current="page" et la classe "active" (mise en évidence en CSS).
+              "end" : « Produits » (/) n'est actif que sur / exactement, pas sur /liste. */}
+          <nav className="nav" aria-label="Pages">
+            <NavLink to="/" end>
+              Produits
+            </NavLink>
+            <NavLink to="/liste">
+              Ma liste <span className="badge">{itemCount}</span>
+            </NavLink>
+          </nav>
+          {/* R57 : interrupteur de traduction. role="switch" dit aux lecteurs d'écran
+              que c'est un interrupteur marche/arrêt, pas une simple case à cocher. */}
+          <label className="toggle">
+            <input
+              type="checkbox"
+              role="switch"
+              checked={french}
+              onChange={(event) => setFrench(event.target.checked)}
             />
-          </>
-        )}
-      </main>
+            Noms en français
+          </label>
+        </header>
+
+        <main>
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
+
+          {status === 'loading' && <p>Chargement…</p>}
+
+          {status === 'error' && (
+            <p className="error" role="alert">
+              Impossible de charger le catalogue. Vérifie ta connexion puis recharge la page.
+            </p>
+          )}
+
+          {status === 'ready' && (
+            // R35 + R37 : <Routes> affiche la <Route> dont le "path" correspond à l'adresse.
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  <ProductsPage
+                    catalog={catalog}
+                    items={items}
+                    listName={LIST_NAME}
+                    french={french}
+                    busy={busy}
+                    onAdd={addQuantity}
+                  />
+                }
+              />
+              <Route
+                path="/liste"
+                element={
+                  <ListPage
+                    items={items}
+                    listName={LIST_NAME}
+                    french={french}
+                    busy={busy}
+                    onAdd={addQuantity}
+                    onRemove={removeAmount}
+                    onToggleBought={(item) => setItems((current) => toggleBought(current, item.id))}
+                  />
+                }
+              />
+              {/* R37 : toute autre adresse renvoie vers Produits. "replace" : l'adresse inconnue
+                  ne reste pas dans l'historique (le bouton « retour » n'y ramène pas). */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          )}
+        </main>
+      </div>
       {/* R27 / R28 : les licornes au caddie, devant le contenu. aria-hidden : décoratif. */}
       <div className="cart-rides" aria-hidden="true">
         {rides.map((ride) => (

@@ -1,12 +1,14 @@
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import App, { CART_RIDE_MS } from './App'
 import { NEIGH_URL } from './sound'
 import { apple, milk } from './test-data'
 
 // Les produits arrivent en anglais (Apple, Milk) ; l'app les affiche en français (Pomme, Lait).
-const CATALOG = { products: [apple, milk] }
+const iphone = { ...apple, id: 124, title: 'iPhone X', price: 899.99, category: 'smartphones' }
+const CATALOG = { products: [apple, milk, iphone] }
 
 type Options = {
   catalogOk?: boolean
@@ -38,6 +40,16 @@ function fakeDummyJson({ catalogOk = true, addOk = true, deleteOk = true }: Opti
 
 type User = ReturnType<typeof userEvent.setup>
 
+// MemoryRouter = un routeur qui garde l'adresse en mémoire (pas de vraie barre d'adresse en test).
+// "initialEntries" choisit la page de départ.
+function renderApp(path = '/') {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <App />
+    </MemoryRouter>,
+  )
+}
+
 // Compte les appels faits avec une méthode donnée.
 function callsWith(fetchMock: ReturnType<typeof fakeDummyJson>, method: string) {
   return fetchMock.mock.calls.filter(([, options]) => (options?.method ?? 'GET') === method)
@@ -56,15 +68,35 @@ async function setQuantity(user: User, container: HTMLElement, quantity: number)
   await user.tab()
 }
 
-function addForm() {
-  return screen.getByRole('form', { name: 'Ajouter un produit' })
+// La carte d'un produit sur la page Produits.
+function findCard(name: string) {
+  return screen.findByRole('article', { name })
 }
 
-// Attend le catalogue, choisit un produit, règle X et clique sur Ajouter.
+// Page Produits : règle X sur la carte du produit et clique sur « Ajouter ».
 async function addFromCatalog(user: User, name: string, quantity = 1) {
-  await user.selectOptions(await screen.findByLabelText('Produit'), name)
-  if (quantity !== 1) await setQuantity(user, addForm(), quantity)
-  await user.click(within(addForm()).getByRole('button', { name: 'Ajouter' }))
+  const card = await findCard(name)
+  if (quantity !== 1) await setQuantity(user, card, quantity)
+  await user.click(within(card).getByRole('button', { name: 'Ajouter' }))
+}
+
+async function goToList(user: User) {
+  await user.click(screen.getByRole('link', { name: /^Ma liste/ }))
+  await screen.findByRole('heading', { name: 'Ma liste', level: 2 })
+}
+
+async function goToProducts(user: User) {
+  await user.click(screen.getByRole('link', { name: 'Produits' }))
+  await screen.findByRole('heading', { name: 'Produits', level: 2 })
+}
+
+// Ajoute depuis Produits puis va sur Ma liste et attend la ligne.
+async function addThenOpenList(user: User, name: string, quantity = 1) {
+  await addFromCatalog(user, name, quantity)
+  // On attend « Dans la liste » sur LA carte du produit (d'autres cartes peuvent l'afficher aussi).
+  await within(await findCard(name)).findByText(/Dans la liste/)
+  await goToList(user)
+  return findLine(name)
 }
 
 // Une ligne de la liste, retrouvée par le nom du produit.
@@ -72,7 +104,7 @@ function getLine(name: string) {
   return screen.getByRole('listitem', { name })
 }
 
-async function findLine(name: string) {
+function findLine(name: string) {
   return screen.findByRole('listitem', { name })
 }
 
@@ -86,42 +118,136 @@ async function lineAction(user: User, name: string, action: 'Ajouter' | 'Retirer
 describe('Catalogue', () => {
   it('R2 : affiche « Chargement… » pendant le chargement du catalogue', async () => {
     fakeDummyJson()
-    render(<App />)
+    renderApp()
     expect(screen.getByText('Chargement…')).toBeInTheDocument()
-    await screen.findByLabelText('Produit')
+    await findCard('Pomme')
   })
 
-  it('R1 : tout le catalogue DummyJSON est chargé et proposé', async () => {
+  it('R1 : tout le catalogue DummyJSON est chargé et affiché', async () => {
     const fetchMock = fakeDummyJson()
-    render(<App />)
-    const select = await screen.findByLabelText('Produit')
-    expect(within(select).getByRole('option', { name: 'Pomme' })).toBeInTheDocument()
-    expect(within(select).getByRole('option', { name: 'Lait' })).toBeInTheDocument()
+    renderApp()
+    expect(await findCard('Pomme')).toBeInTheDocument()
+    expect(screen.getByRole('article', { name: 'Lait' })).toBeInTheDocument()
+    expect(screen.getByRole('article', { name: 'iPhone X' })).toBeInTheDocument()
     expect(String(fetchMock.mock.calls[0][0])).toContain('/products?limit=0')
   })
 
   it('R3 : si le catalogue ne charge pas, une erreur est affichée et on ne peut rien ajouter', async () => {
     fakeDummyJson({ catalogOk: false })
-    render(<App />)
+    renderApp()
     expect(await screen.findByRole('alert')).toHaveTextContent(/catalogue/i)
     expect(screen.queryByRole('button', { name: 'Ajouter' })).not.toBeInTheDocument()
   })
 })
 
-describe('Ajouter', () => {
-  it('R5 : la liste commence vide', async () => {
+describe('Deux pages', () => {
+  it('R35 : un menu permet de passer de Produits à Ma liste et inversement', async () => {
     fakeDummyJson()
-    render(<App />)
-    await screen.findByLabelText('Produit')
-    expect(screen.getByText('La liste est vide')).toBeInTheDocument()
+    const user = userEvent.setup()
+    renderApp()
+    await findCard('Pomme')
+    await goToList(user)
+    expect(screen.queryByRole('article', { name: 'Pomme' })).not.toBeInTheDocument()
+    await goToProducts(user)
+    expect(await findCard('Pomme')).toBeInTheDocument()
+  })
+
+  it('R35 : la page courante est mise en évidence dans le menu', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    renderApp()
+    await findCard('Pomme')
+    expect(screen.getByRole('link', { name: 'Produits' })).toHaveAttribute('aria-current', 'page')
+    await goToList(user)
+    expect(screen.getByRole('link', { name: /^Ma liste/ })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Produits' })).not.toHaveAttribute('aria-current')
+  })
+
+  it("R36 : le lien « Ma liste » affiche le nombre d'articles", async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    renderApp()
+    expect(await screen.findByRole('link', { name: 'Ma liste 0' })).toBeInTheDocument()
+    await addFromCatalog(user, 'Pomme', 3)
+    await addFromCatalog(user, 'Lait', 2)
+    expect(await screen.findByRole('link', { name: 'Ma liste 5' })).toBeInTheDocument()
+  })
+
+  it('R37 : ouvrir directement /liste affiche Ma liste', async () => {
+    fakeDummyJson()
+    renderApp('/liste')
+    expect(await screen.findByRole('heading', { name: 'Ma liste', level: 2 })).toBeInTheDocument()
+  })
+
+  it('R37 : une adresse inconnue affiche la page Produits', async () => {
+    fakeDummyJson()
+    renderApp('/nimporte-quoi')
+    expect(await screen.findByRole('heading', { name: 'Produits', level: 2 })).toBeInTheDocument()
+  })
+})
+
+describe('Page Produits', () => {
+  it('R38 : une carte affiche image, nom, catégorie et prix en français', async () => {
+    fakeDummyJson()
+    renderApp()
+    const card = await findCard('Pomme')
+    expect(card.querySelector('img')).toHaveAttribute('src', apple.thumbnail)
+    expect(plainText(card)).toContain('Épicerie')
+    expect(plainText(card)).toContain('1,99 €')
+  })
+
+  it('R39 : la recherche filtre par nom, sans accents ni majuscules', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    renderApp()
+    await findCard('Pomme')
+    await user.type(screen.getByRole('searchbox', { name: 'Rechercher' }), 'POMME')
+    expect(screen.getByRole('article', { name: 'Pomme' })).toBeInTheDocument()
+    expect(screen.queryByRole('article', { name: 'Lait' })).not.toBeInTheDocument()
+  })
+
+  it('R39 : le filtre Catégorie se combine à la recherche ; aucun résultat -> message', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    renderApp()
+    await findCard('Pomme')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Catégorie' }), 'Smartphones')
+    expect(screen.getByRole('article', { name: 'iPhone X' })).toBeInTheDocument()
+    expect(screen.queryByRole('article', { name: 'Pomme' })).not.toBeInTheDocument()
+    await user.type(screen.getByRole('searchbox', { name: 'Rechercher' }), 'lait')
+    expect(screen.getByText('Aucun produit trouvé')).toBeInTheDocument()
+  })
+
+  it('R40 : la page indique la liste dans laquelle on ajoute', async () => {
+    fakeDummyJson()
+    renderApp()
+    await findCard('Pomme')
+    expect(plainText(screen.getByText(/Ajouter à/))).toBe('Ajouter à : Ma liste')
+  })
+
+  it('R41 : une carte dont le produit est dans la liste affiche « Dans la liste : N »', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    renderApp()
+    await addFromCatalog(user, 'Pomme', 4)
+    expect(await within(await findCard('Pomme')).findByText('Dans la liste : 4')).toBeInTheDocument()
+    expect(within(await findCard('Lait')).queryByText(/Dans la liste/)).not.toBeInTheDocument()
+  })
+})
+
+describe('Ajouter', () => {
+  it('R5 : la liste commence vide, avec un lien vers les produits', async () => {
+    fakeDummyJson()
+    renderApp('/liste')
+    expect(await screen.findByText('La liste est vide')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Choisir des produits' })).toHaveAttribute('href', '/')
   })
 
   it("R9 : ajouter X d'un produit absent appelle POST (nom anglais) et crée la ligne avec X", async () => {
     const fetchMock = fakeDummyJson()
     const user = userEvent.setup()
-    render(<App />)
-    await addFromCatalog(user, 'Pomme', 3)
-    const line = await findLine('Pomme')
+    renderApp()
+    const line = await addThenOpenList(user, 'Pomme', 3)
     expect(plainText(line)).toContain('3 × 1,99 € = 5,97 €')
     const posts = callsWith(fetchMock, 'POST')
     expect(posts).toHaveLength(1)
@@ -131,11 +257,13 @@ describe('Ajouter', () => {
   it('R10 : rajouter un produit présent ajoute X, sans appel API ni nouvelle ligne', async () => {
     const fetchMock = fakeDummyJson()
     const user = userEvent.setup()
-    render(<App />)
+    renderApp()
     await addFromCatalog(user, 'Pomme', 2)
-    await findLine('Pomme')
+    await screen.findByText('Dans la liste : 2')
     await addFromCatalog(user, 'Pomme', 3)
-    expect(plainText(getLine('Pomme'))).toContain('5 × 1,99 €')
+    await screen.findByText('Dans la liste : 5')
+    await goToList(user)
+    expect(plainText(await findLine('Pomme'))).toContain('5 × 1,99 €')
     expect(screen.getAllByRole('listitem')).toHaveLength(1)
     expect(callsWith(fetchMock, 'POST')).toHaveLength(1)
   })
@@ -143,31 +271,33 @@ describe('Ajouter', () => {
   it('R10 : rajouter un produit coché « acheté » le décoche', async () => {
     fakeDummyJson()
     const user = userEvent.setup()
-    render(<App />)
+    renderApp()
+    const line = await addThenOpenList(user, 'Pomme')
+    await user.click(within(line).getByRole('checkbox'))
+    await goToProducts(user)
     await addFromCatalog(user, 'Pomme')
-    await user.click(within(await findLine('Pomme')).getByRole('checkbox'))
-    await addFromCatalog(user, 'Pomme')
-    expect(within(getLine('Pomme')).getByRole('checkbox')).not.toBeChecked()
+    await screen.findByText('Dans la liste : 2')
+    await goToList(user)
+    expect(within(await findLine('Pomme')).getByRole('checkbox')).not.toBeChecked()
   })
 
-  it('R8 : sans produit choisi, Ajouter ne fait rien ; pas de champ texte libre pour le nom', async () => {
-    const fetchMock = fakeDummyJson()
-    const user = userEvent.setup()
-    render(<App />)
-    await screen.findByLabelText('Produit')
-    await user.click(within(addForm()).getByRole('button', { name: 'Ajouter' }))
-    expect(callsWith(fetchMock, 'POST')).toHaveLength(0)
-    expect(screen.getByText('La liste est vide')).toBeInTheDocument()
-    // Le seul champ texte est celui de la quantité.
-    expect(within(addForm()).getAllByRole('textbox')).toHaveLength(1)
+  it('R8 : on ne peut ajouter que des produits du catalogue (aucun champ pour taper un nom)', async () => {
+    fakeDummyJson()
+    renderApp()
+    await findCard('Pomme')
+    // Les seuls champs texte sont les quantités (la recherche est un "searchbox", pas un "textbox").
+    for (const field of screen.getAllByRole('textbox')) {
+      expect(field).toHaveAccessibleName('Quantité')
+    }
   })
 
   it("R12 : si l'ajout échoue, une erreur est affichée et la liste ne change pas", async () => {
     fakeDummyJson({ addOk: false })
     const user = userEvent.setup()
-    render(<App />)
+    renderApp()
     await addFromCatalog(user, 'Pomme')
     expect(await screen.findByRole('alert')).toHaveTextContent(/ajout/i)
+    await goToList(user)
     expect(screen.getByText('La liste est vide')).toBeInTheDocument()
   })
 })
@@ -176,27 +306,25 @@ describe('Quantité X (R43)', () => {
   it('R43 : X vaut 1 par défaut ; « − » est désactivé à 1, « + » augmente', async () => {
     fakeDummyJson()
     const user = userEvent.setup()
-    render(<App />)
-    await screen.findByLabelText('Produit')
-    const form = addForm()
-    const input = within(form).getByRole('textbox', { name: 'Quantité' })
+    renderApp()
+    const card = await findCard('Pomme')
+    const input = within(card).getByRole('textbox', { name: 'Quantité' })
     expect(input).toHaveValue('1')
-    expect(within(form).getByRole('button', { name: 'Moins un' })).toBeDisabled()
-    await user.click(within(form).getByRole('button', { name: 'Plus un' }))
+    expect(within(card).getByRole('button', { name: 'Moins un' })).toBeDisabled()
+    await user.click(within(card).getByRole('button', { name: 'Plus un' }))
     expect(input).toHaveValue('2')
   })
 
   it('R43 : une saisie invalide est ramenée entre 1 et 99 en quittant le champ', async () => {
     fakeDummyJson()
     const user = userEvent.setup()
-    render(<App />)
-    await screen.findByLabelText('Produit')
-    const form = addForm()
-    const input = within(form).getByRole('textbox', { name: 'Quantité' })
-    await setQuantity(user, form, 150)
+    renderApp()
+    const card = await findCard('Pomme')
+    const input = within(card).getByRole('textbox', { name: 'Quantité' })
+    await setQuantity(user, card, 150)
     expect(input).toHaveValue('99')
-    expect(within(form).getByRole('button', { name: 'Plus un' })).toBeDisabled()
-    await setQuantity(user, form, 0)
+    expect(within(card).getByRole('button', { name: 'Plus un' })).toBeDisabled()
+    await setQuantity(user, card, 0)
     expect(input).toHaveValue('1')
     await user.clear(input)
     await user.type(input, 'abc')
@@ -204,13 +332,15 @@ describe('Quantité X (R43)', () => {
     expect(input).toHaveValue('1')
   })
 
-  it('R43 : après un ajout réussi, X revient à 1 (formulaire et ligne)', async () => {
+  it('R43 : après un ajout réussi, X revient à 1 (carte et ligne)', async () => {
     fakeDummyJson()
     const user = userEvent.setup()
-    render(<App />)
+    renderApp()
     await addFromCatalog(user, 'Pomme', 3)
+    await screen.findByText('Dans la liste : 3')
+    expect(within(await findCard('Pomme')).getByRole('textbox', { name: 'Quantité' })).toHaveValue('1')
+    await goToList(user)
     await findLine('Pomme')
-    expect(within(addForm()).getByRole('textbox', { name: 'Quantité' })).toHaveValue('1')
     await lineAction(user, 'Pomme', 'Ajouter', 4)
     expect(within(getLine('Pomme')).getByRole('textbox', { name: 'Quantité' })).toHaveValue('1')
   })
@@ -220,9 +350,8 @@ describe('Ma liste', () => {
   it('R6 : une ligne affiche image, nom, prix unitaire, quantité, sous-total, case et boutons', async () => {
     fakeDummyJson()
     const user = userEvent.setup()
-    render(<App />)
-    await addFromCatalog(user, 'Lait', 2)
-    const line = await findLine('Lait')
+    renderApp()
+    const line = await addThenOpenList(user, 'Lait', 2)
     expect(line.querySelector('img')).toHaveAttribute('src', milk.thumbnail)
     expect(plainText(line)).toContain('Lait')
     expect(plainText(line)).toContain('2 × 3,49 € = 6,98 €')
@@ -235,10 +364,11 @@ describe('Ma liste', () => {
   it("R7 : les lignes à acheter sont dans l'ordre du premier ajout", async () => {
     fakeDummyJson()
     const user = userEvent.setup()
-    render(<App />)
+    renderApp()
     await addFromCatalog(user, 'Lait')
-    await findLine('Lait')
+    await screen.findByText('Dans la liste : 1')
     await addFromCatalog(user, 'Pomme')
+    await goToList(user)
     await findLine('Pomme')
     const lines = within(screen.getByRole('list', { name: 'À acheter' })).getAllByRole('listitem')
     expect(lines.map((line) => line.getAttribute('aria-label'))).toEqual(['Lait', 'Pomme'])
@@ -247,9 +377,8 @@ describe('Ma liste', () => {
   it('R44 : « Ajouter » sur une ligne ajoute X sans appel API', async () => {
     const fetchMock = fakeDummyJson()
     const user = userEvent.setup()
-    render(<App />)
-    await addFromCatalog(user, 'Pomme')
-    await findLine('Pomme')
+    renderApp()
+    await addThenOpenList(user, 'Pomme')
     await lineAction(user, 'Pomme', 'Ajouter', 4)
     expect(plainText(getLine('Pomme'))).toContain('5 × 1,99 €')
     expect(callsWith(fetchMock, 'POST')).toHaveLength(1)
@@ -258,9 +387,8 @@ describe('Ma liste', () => {
   it('R44 : « Retirer » X < quantité baisse la quantité sans appel API', async () => {
     const fetchMock = fakeDummyJson()
     const user = userEvent.setup()
-    render(<App />)
-    await addFromCatalog(user, 'Pomme', 5)
-    await findLine('Pomme')
+    renderApp()
+    await addThenOpenList(user, 'Pomme', 5)
     await lineAction(user, 'Pomme', 'Retirer', 2)
     expect(plainText(getLine('Pomme'))).toContain('3 × 1,99 €')
     expect(callsWith(fetchMock, 'DELETE')).toHaveLength(0)
@@ -269,9 +397,8 @@ describe('Ma liste', () => {
   it("R44 + R14 : « Retirer » X ≥ quantité appelle DELETE avec l'id du catalogue et retire la ligne", async () => {
     const fetchMock = fakeDummyJson()
     const user = userEvent.setup()
-    render(<App />)
-    await addFromCatalog(user, 'Pomme', 2)
-    await findLine('Pomme')
+    renderApp()
+    await addThenOpenList(user, 'Pomme', 2)
     await lineAction(user, 'Pomme', 'Retirer', 5)
     expect(await screen.findByText('La liste est vide')).toBeInTheDocument()
     const deletes = callsWith(fetchMock, 'DELETE')
@@ -282,9 +409,8 @@ describe('Ma liste', () => {
   it('R15 : si la suppression échoue, une erreur est affichée et la ligne reste', async () => {
     fakeDummyJson({ deleteOk: false })
     const user = userEvent.setup()
-    render(<App />)
-    await addFromCatalog(user, 'Pomme')
-    await findLine('Pomme')
+    renderApp()
+    await addThenOpenList(user, 'Pomme')
     await lineAction(user, 'Pomme', 'Retirer')
     expect(await screen.findByRole('alert')).toHaveTextContent(/suppression/i)
     expect(getLine('Pomme')).toBeInTheDocument()
@@ -293,7 +419,7 @@ describe('Ma liste', () => {
   it("R17 : le message d'erreur disparaît quand l'action suivante réussit", async () => {
     const fetchMock = fakeDummyJson({ addOk: false })
     const user = userEvent.setup()
-    render(<App />)
+    renderApp()
     await addFromCatalog(user, 'Pomme')
     await screen.findByRole('alert')
     // DummyJSON remarche : on remplace le faux fetch par une version qui réussit.
@@ -301,28 +427,44 @@ describe('Ma liste', () => {
       const title = JSON.parse(String(options?.body)).title
       return { ok: true, status: 200, json: async () => ({ id: 195, title }) } as Response
     })
-    await user.click(within(addForm()).getByRole('button', { name: 'Ajouter' }))
-    await findLine('Pomme')
+    await addFromCatalog(user, 'Pomme')
+    await screen.findByText('Dans la liste : 1')
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it("R18 : les boutons Ajouter et Retirer sont désactivés pendant un appel à l'API", async () => {
+  it("R18 : les boutons Ajouter sont désactivés pendant un appel à l'API", async () => {
     let finishPost: (value: Response) => void = () => {}
     const fetchMock = fakeDummyJson()
     const user = userEvent.setup()
-    render(<App />)
-    await addFromCatalog(user, 'Lait')
-    await findLine('Lait')
+    renderApp()
+    await findCard('Pomme')
     // Le prochain POST ne répond pas tout de suite : on garde la main pour vérifier pendant l'attente.
     fetchMock.mockImplementationOnce(
       () => new Promise<Response>((resolve) => (finishPost = resolve)),
     )
     await addFromCatalog(user, 'Pomme')
-    expect(within(addForm()).getByRole('button', { name: 'Ajouter' })).toBeDisabled()
-    expect(within(getLine('Lait')).getByRole('button', { name: 'Retirer' })).toBeDisabled()
+    expect(within(await findCard('Lait')).getByRole('button', { name: 'Ajouter' })).toBeDisabled()
     finishPost({ ok: true, status: 200, json: async () => ({ id: 195 }) } as Response)
-    await findLine('Pomme')
-    expect(within(addForm()).getByRole('button', { name: 'Ajouter' })).toBeEnabled()
+    await screen.findByText('Dans la liste : 1')
+    expect(within(await findCard('Lait')).getByRole('button', { name: 'Ajouter' })).toBeEnabled()
+  })
+
+  it("R18 : le bouton Retirer est désactivé pendant un appel à l'API", async () => {
+    let finishDelete: (value: Response) => void = () => {}
+    const fetchMock = fakeDummyJson()
+    const user = userEvent.setup()
+    renderApp()
+    await addFromCatalog(user, 'Lait')
+    await screen.findByText('Dans la liste : 1')
+    await addThenOpenList(user, 'Pomme')
+    fetchMock.mockImplementationOnce(
+      () => new Promise<Response>((resolve) => (finishDelete = resolve)),
+    )
+    await lineAction(user, 'Pomme', 'Retirer')
+    expect(within(getLine('Lait')).getByRole('button', { name: 'Retirer' })).toBeDisabled()
+    finishDelete({ ok: true, status: 200, json: async () => ({ id: 16 }) } as Response)
+    await screen.findByRole('listitem', { name: 'Lait' })
+    expect(await within(getLine('Lait')).findByRole('button', { name: 'Retirer' })).toBeEnabled()
   })
 })
 
@@ -330,11 +472,10 @@ describe('Prix, total et « déjà acheté »', () => {
   it('R46 : le récapitulatif affiche articles, total, déjà acheté et reste à payer', async () => {
     fakeDummyJson()
     const user = userEvent.setup()
-    render(<App />)
+    renderApp()
     await addFromCatalog(user, 'Pomme', 3) // 5,97 €
-    await findLine('Pomme')
-    await addFromCatalog(user, 'Lait', 2) // 6,98 €
-    await findLine('Lait')
+    await screen.findByText('Dans la liste : 3')
+    await addThenOpenList(user, 'Lait', 2) // 6,98 €
     const summary = plainText(screen.getByLabelText('Récapitulatif'))
     expect(summary).toContain('Articles5')
     expect(summary).toContain('Total12,95 €')
@@ -345,11 +486,10 @@ describe('Prix, total et « déjà acheté »', () => {
   it('R48 : cocher une ligne la barre, la descend dans « Déjà acheté » et change le reste à payer', async () => {
     fakeDummyJson()
     const user = userEvent.setup()
-    render(<App />)
+    renderApp()
     await addFromCatalog(user, 'Pomme', 3)
-    await findLine('Pomme')
-    await addFromCatalog(user, 'Lait', 2)
-    await findLine('Lait')
+    await screen.findByText('Dans la liste : 3')
+    await addThenOpenList(user, 'Lait', 2)
     await user.click(within(getLine('Pomme')).getByRole('checkbox'))
     const boughtList = screen.getByRole('list', { name: 'Déjà acheté' })
     expect(within(boughtList).getByRole('listitem', { name: 'Pomme' })).toHaveClass('line--bought')
@@ -361,9 +501,8 @@ describe('Prix, total et « déjà acheté »', () => {
   it("R48 : décocher remet la ligne à acheter ; cocher ne fait pas d'appel API", async () => {
     const fetchMock = fakeDummyJson()
     const user = userEvent.setup()
-    render(<App />)
-    await addFromCatalog(user, 'Pomme')
-    await findLine('Pomme')
+    renderApp()
+    await addThenOpenList(user, 'Pomme')
     const callsBefore = fetchMock.mock.calls.length
     await user.click(within(getLine('Pomme')).getByRole('checkbox'))
     await user.click(within(getLine('Pomme')).getByRole('checkbox'))
@@ -377,32 +516,40 @@ describe("Traduction dans l'app", () => {
   it('R57 : l\'interrupteur « Noms en français » est activé par défaut et passe en anglais', async () => {
     fakeDummyJson()
     const user = userEvent.setup()
-    render(<App />)
-    await addFromCatalog(user, 'Pomme')
-    await findLine('Pomme')
+    renderApp()
+    await findCard('Pomme')
     const toggle = screen.getByRole('switch', { name: 'Noms en français' })
     expect(toggle).toBeChecked()
     await user.click(toggle)
-    expect(getLine('Apple')).toBeInTheDocument()
-    const select = screen.getByLabelText('Produit')
-    expect(within(select).getByRole('option', { name: 'Milk' })).toBeInTheDocument()
+    expect(await findCard('Apple')).toBeInTheDocument()
+    expect(plainText(await findCard('Apple'))).toContain('groceries')
   })
 
   it('R57 : le choix est gardé après un rechargement', async () => {
     fakeDummyJson()
     const user = userEvent.setup()
-    const { unmount } = render(<App />)
-    await screen.findByLabelText('Produit')
+    const { unmount } = renderApp()
+    await findCard('Pomme')
     await user.click(screen.getByRole('switch', { name: 'Noms en français' }))
     unmount() // = fermer la page...
-    render(<App />) // ...et la rouvrir
-    await screen.findByLabelText('Produit')
+    renderApp() // ...et la rouvrir
+    expect(await findCard('Apple')).toBeInTheDocument()
     expect(screen.getByRole('switch', { name: 'Noms en français' })).not.toBeChecked()
+  })
+
+  it('R57 : la recherche marche en français même quand les noms sont en anglais', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    renderApp()
+    await findCard('Pomme')
+    await user.click(screen.getByRole('switch', { name: 'Noms en français' }))
+    await user.type(screen.getByRole('searchbox', { name: 'Rechercher' }), 'pomme')
+    expect(screen.getByRole('article', { name: 'Apple' })).toBeInTheDocument()
   })
 
   it("R21 : l'interface est en français", async () => {
     fakeDummyJson()
-    render(<App />)
+    renderApp()
     expect(await screen.findByRole('heading', { name: 'Liste de courses' })).toBeInTheDocument()
   })
 })
@@ -415,8 +562,8 @@ function neighCount() {
 describe('Licornes', () => {
   it("R25 : 6 licornes SVG volent en fond, cachées aux lecteurs d'écran", async () => {
     fakeDummyJson()
-    render(<App />)
-    await screen.findByLabelText('Produit')
+    renderApp()
+    await findCard('Pomme')
     const sky = screen.getByTestId('sky')
     expect(sky).toHaveAttribute('aria-hidden', 'true')
     expect(sky.querySelectorAll('.flyer svg')).toHaveLength(6)
@@ -425,7 +572,7 @@ describe('Licornes', () => {
   it('R27 : un ajout réussi fait hennir et passer une licorne au caddie « X × nom »', async () => {
     fakeDummyJson()
     const user = userEvent.setup()
-    render(<App />)
+    renderApp()
     await addFromCatalog(user, 'Pomme', 2)
     const ride = await screen.findByTestId('cart-unicorn')
     expect(ride).toHaveTextContent('2 × Pomme')
@@ -436,9 +583,8 @@ describe('Licornes', () => {
   it('R27 : ajouter depuis une ligne fait aussi passer une licorne au caddie', async () => {
     fakeDummyJson()
     const user = userEvent.setup()
-    render(<App />)
-    await addFromCatalog(user, 'Pomme')
-    await findLine('Pomme')
+    renderApp()
+    await addThenOpenList(user, 'Pomme')
     await lineAction(user, 'Pomme', 'Ajouter', 3)
     expect(screen.getAllByTestId('cart-unicorn')[1]).toHaveTextContent('3 × Pomme')
     expect(neighCount()).toBe(2)
@@ -447,9 +593,8 @@ describe('Licornes', () => {
   it('R28 : un retrait partiel réussi fait passer une licorne « retour », nom barré', async () => {
     fakeDummyJson()
     const user = userEvent.setup()
-    render(<App />)
-    await addFromCatalog(user, 'Pomme', 5)
-    await findLine('Pomme')
+    renderApp()
+    await addThenOpenList(user, 'Pomme', 5)
     await lineAction(user, 'Pomme', 'Retirer', 2)
     expect(document.querySelector('.cart-ride--remove')).toHaveTextContent('2 × Pomme')
     expect(neighCount()).toBe(2)
@@ -458,9 +603,8 @@ describe('Licornes', () => {
   it('R28 : un retrait complet affiche la quantité vraiment retirée', async () => {
     fakeDummyJson()
     const user = userEvent.setup()
-    render(<App />)
-    await addFromCatalog(user, 'Pomme', 2)
-    await findLine('Pomme')
+    renderApp()
+    await addThenOpenList(user, 'Pomme', 2)
     await lineAction(user, 'Pomme', 'Retirer', 9)
     await screen.findByText('La liste est vide')
     expect(document.querySelector('.cart-ride--remove')).toHaveTextContent('2 × Pomme')
@@ -469,7 +613,7 @@ describe('Licornes', () => {
   it('R29 : un ajout raté ne fait ni hennir ni passer de licorne au caddie', async () => {
     fakeDummyJson({ addOk: false })
     const user = userEvent.setup()
-    render(<App />)
+    renderApp()
     await addFromCatalog(user, 'Pomme')
     await screen.findByRole('alert')
     expect(screen.queryByTestId('cart-unicorn')).not.toBeInTheDocument()
@@ -479,9 +623,8 @@ describe('Licornes', () => {
   it('R29 : une suppression ratée ou une case cochée ne font pas passer de licorne', async () => {
     fakeDummyJson({ deleteOk: false })
     const user = userEvent.setup()
-    render(<App />)
-    await addFromCatalog(user, 'Pomme')
-    await findLine('Pomme')
+    renderApp()
+    await addThenOpenList(user, 'Pomme')
     await user.click(within(getLine('Pomme')).getByRole('checkbox'))
     await lineAction(user, 'Pomme', 'Retirer')
     await screen.findByRole('alert')
@@ -492,7 +635,7 @@ describe('Licornes', () => {
   it('R30 : le son joué est le fichier du hennissement', async () => {
     fakeDummyJson()
     const user = userEvent.setup()
-    render(<App />)
+    renderApp()
     await addFromCatalog(user, 'Pomme')
     await screen.findByTestId('cart-unicorn')
     const audio = vi.mocked(HTMLMediaElement.prototype.play).mock.contexts[0] as HTMLAudioElement
@@ -503,9 +646,9 @@ describe('Licornes', () => {
     vi.mocked(HTMLMediaElement.prototype.play).mockRejectedValue(new Error('NotSupportedError'))
     fakeDummyJson()
     const user = userEvent.setup()
-    render(<App />)
+    renderApp()
     await addFromCatalog(user, 'Pomme')
-    expect(await findLine('Pomme')).toBeInTheDocument()
+    expect(await screen.findByText('Dans la liste : 1')).toBeInTheDocument()
     expect(screen.getByTestId('cart-unicorn')).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
@@ -516,11 +659,11 @@ describe('Licornes', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     fakeDummyJson()
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-    render(<App />)
+    renderApp()
     await addFromCatalog(user, 'Pomme')
-    await findLine('Pomme')
+    await screen.findByText('Dans la liste : 1')
     await addFromCatalog(user, 'Lait')
-    await findLine('Lait')
+    await within(await findCard('Lait')).findByText('Dans la liste : 1')
     expect(screen.getAllByTestId('cart-unicorn')).toHaveLength(2)
     act(() => {
       vi.advanceTimersByTime(CART_RIDE_MS)

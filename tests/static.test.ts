@@ -70,4 +70,12 @@ describe('fichiers statiques', () => {
     expect(html).toContain('<html lang="fr">')
     expect(html).toContain('<title>Liste de courses</title>')
   })
+
+  it('R37 + R56 : nginx renvoie index.html pour les adresses de pages (/liste)', () => {
+    const conf = readFileSync('nginx.conf', 'utf8')
+    expect(conf).toContain('listen 8080')
+    expect(conf).toMatch(/try_files \$uri \$uri\/ \/index\.html;/)
+    const dockerfile = readFileSync('Dockerfile', 'utf8')
+    expect(dockerfile).toContain('COPY nginx.conf /etc/nginx/conf.d/default.conf')
+  })
 })

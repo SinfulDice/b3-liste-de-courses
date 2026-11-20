@@ -1,15 +1,5 @@
 import { useState } from 'react'
-
-export const MIN_QUANTITY = 1
-export const MAX_QUANTITY = 99
-
-// R43 : ramène n'importe quelle saisie à un entier entre 1 et 99.
-// "abc" ou "" -> 1 ; "0" -> 1 ; "150" -> 99 ; "3.7" -> 3.
-export function clampQuantity(text: string): number {
-  const value = Number.parseInt(text, 10) // texte -> entier (NaN si ce n'est pas un nombre)
-  if (Number.isNaN(value)) return MIN_QUANTITY
-  return Math.min(MAX_QUANTITY, Math.max(MIN_QUANTITY, value))
-}
+import { MAX_QUANTITY, MIN_QUANTITY, clampQuantity } from './quantity'
 
 type Props = {
   value: number

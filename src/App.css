@@ -1,39 +1,191 @@
-/* R20 : une colonne centrée, max 560px ; sur mobile elle prend toute la largeur moins 16px de chaque côté. */
+/* R20 : une colonne centrée, max 960px (la grille de produits a besoin de place) ;
+   sur mobile elle prend toute la largeur moins 16px de chaque côté. */
 .app {
   position: relative; /* R25 : le contenu passe au-dessus du ciel de licornes (z-index 0) */
   z-index: 1;
-  max-width: 560px;
+  max-width: 960px;
   margin: 0 auto;
-  padding: 32px 16px;
+  padding: 24px 16px 32px;
 }
 
 h1 {
-  margin: 0 0 24px;
-  font-size: 1.8rem;
+  margin: 0;
+  font-size: 1.6rem;
 }
 
-/* Formulaire d'ajout : label au-dessus, puis menu + bouton sur une ligne. */
-.add-form {
+h2 {
+  margin: 0 0 8px;
+  font-size: 1.3rem;
+}
+
+/* En-tête : titre, menu et interrupteur. flex-wrap : sur mobile, ils passent les uns sous les autres. */
+.header {
   display: flex;
-  flex-wrap: wrap; /* si la place manque, le bouton passe à la ligne */
-  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  margin-bottom: 24px;
+}
+
+/* R35 : le menu. Deux "onglets" collés. */
+.nav {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+
+.nav a {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* NavLink ajoute la classe "active" au lien de la page actuelle. */
+.nav a.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* R36 : la pastille avec le nombre d'articles. */
+.badge {
+  min-width: 1.6em;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--border);
+  color: var(--text);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.nav a.active .badge {
+  background: rgb(255 255 255 / 0.25);
+  color: #fff;
+}
+
+/* La page Ma liste reste étroite : une liste trop large se lit mal. */
+section[aria-labelledby='list-title'] {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.target-list {
+  margin: 0 0 16px;
+  color: var(--muted);
+}
+
+.target-list strong {
+  color: var(--text);
+}
+
+/* R39 : recherche + catégorie, côte à côte (ou l'une sous l'autre sur mobile). */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
   margin-bottom: 16px;
 }
 
-.add-form label {
-  width: 100%;
+.filter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 200px; /* chaque filtre fait au moins 200px, puis grandit pour remplir la ligne */
   font-weight: 600;
 }
 
-.add-form select {
-  flex: 1; /* le menu prend toute la place restante */
-  min-width: 0; /* sans ça, un long nom pourrait faire déborder la page sur mobile */
+.filter input,
+.filter select {
   padding: 10px;
   font-size: 1rem;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--card);
   color: var(--text);
+}
+
+/* R38 : la grille de cartes. auto-fill + minmax : "mets autant de colonnes de 200px minimum
+   que possible, et partage la place qui reste". 1 colonne sur mobile, 4 sur un grand écran,
+   sans aucune @media. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* l'image ne dépasse pas des coins arrondis */
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.card-img {
+  width: 100%;
+  aspect-ratio: 4 / 3; /* même hauteur pour toutes les images, quelle que soit leur taille */
+  object-fit: contain;
+  background: #fff;
+}
+
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  padding: 12px;
+}
+
+.card-name {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.card-category,
+.card-in-list {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.card-in-list {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.card-price {
+  margin: 0;
+  font-weight: 700;
+}
+
+/* margin-top: auto pousse les boutons en bas de la carte : ils sont alignés d'une carte à l'autre. */
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.card-actions button:last-child {
+  flex: 1;
+}
+
+.empty-link {
+  text-align: center;
+}
+
+.empty-link a {
+  color: var(--accent);
+  font-weight: 600;
 }
 
 button {
