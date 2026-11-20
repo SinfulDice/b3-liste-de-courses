@@ -170,7 +170,7 @@ function App() {
       <div className="app">
         {/* En-tête commun aux trois pages (R35, R49, R57). */}
         <header className="header">
-          <h1>Liste de courses</h1>
+          <h1>Caddicorn</h1>
           {/* R35 : NavLink = un lien qui sait s'il pointe vers la page actuelle : il reçoit alors
               aria-current="page" et la classe "active" (mise en évidence en CSS).
               "end" : « Produits » (/) n'est actif que sur / exactement, pas sur /liste. */}
