@@ -47,9 +47,10 @@ export function Unicorn({ className }: UnicornProps) {
       <path d="M90 15 L101 1 L95 17 Z" fill="#ffd257" stroke="#e0a800" strokeWidth="1" />
       <circle cx="97" cy="23" r="1.8" fill="#3a2a4f" />
 
-      {/* Aile en plumes (les petites bosses), posée sur le corps */}
+      {/* Aile en plumes (les petites bosses), attachée au dos : la pointe part vers la queue,
+          les plumes sont sur le bord arrière (R25). */}
       <path
-        d="M48 40 C40 22 48 6 74 6 C70 10 70 12 66 14 C70 16 68 19 63 20 C66 23 64 26 60 27 C62 31 60 35 58 40 Z"
+        d="M64 40 C72 22 64 6 38 6 C42 10 42 12 46 14 C42 16 44 19 49 20 C46 23 48 26 52 27 C50 31 52 35 54 40 Z"
         fill="#eaf6ff"
         stroke="#9fc9ea"
         strokeWidth="2"

@@ -12,12 +12,19 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return response.json() as Promise<T>
 }
 
-// R1 : le catalogue. "select=title" demande à DummyJSON de n'envoyer que le titre (et l'id).
+// R1 : tout le catalogue. "limit=0" = tous les produits (194) ; "select=…" demande à DummyJSON
+// de n'envoyer que ces champs (et l'id), ce qui allège beaucoup la réponse.
 export async function fetchCatalog(): Promise<Product[]> {
   const data = await request<{ products: Product[] }>(
-    `${API}/products/category/groceries?select=title&limit=0`,
+    `${API}/products?limit=0&select=title,price,thumbnail,category`,
   )
-  return data.products.map(({ id, title }) => ({ id, title }))
+  return data.products.map(({ id, title, price, thumbnail, category }) => ({
+    id,
+    title,
+    price,
+    thumbnail,
+    category,
+  }))
 }
 
 // R9 : DummyJSON fait semblant d'ajouter le produit (il renvoie toujours id 195, R11).

@@ -93,6 +93,8 @@
 /* Le nom du produit, posé dans le panier du caddie. */
 .cart-ride-label {
   position: absolute;
+  /* Au premier plan : sinon le caddie retourné (scale, R28) se dessine par-dessus. */
+  z-index: 1;
   left: 16px;
   bottom: 40px;
   max-width: 140px;
@@ -107,10 +109,37 @@
   text-overflow: ellipsis; /* nom trop long -> "Chicken Me…" */
 }
 
-/* R28 : suppression -> nom barré. */
+/* R28 : retrait -> nom barré... */
 .cart-ride--remove .cart-ride-label {
   text-decoration: line-through;
   background: #ffd0d0;
+}
+
+/* ...et la licorne repart dans l'autre sens : de droite à gauche. */
+.cart-ride--remove {
+  left: auto;
+  right: 0;
+  flex-direction: row-reverse; /* le caddie passe à gauche de la licorne */
+  animation-name: ride-back;
+}
+
+.cart-ride--remove .cart-ride-cart {
+  margin-left: 0;
+  margin-right: -26px;
+}
+
+/* "scale: -1 1" retourne le dessin comme dans un miroir (gauche <-> droite).
+   On utilise la propriété "scale" et pas "transform" : la licorne a déjà une animation
+   "transform" (bob), et un second transform l'écraserait. Les deux propriétés s'additionnent. */
+.cart-ride--remove .cart-ride-unicorn,
+.cart-ride--remove .cart-ride-cart svg {
+  scale: -1 1;
+}
+
+/* L'étiquette n'est pas retournée (sinon le texte serait à l'envers) : on la recale à droite. */
+.cart-ride--remove .cart-ride-label {
+  left: auto;
+  right: 16px;
 }
 
 @keyframes ride-across {
@@ -119,6 +148,16 @@
   }
   to {
     transform: translateX(100vw);
+  }
+}
+
+/* Le chemin inverse : part à droite de l'écran, finit à gauche. */
+@keyframes ride-back {
+  from {
+    transform: translateX(220px);
+  }
+  to {
+    transform: translateX(-100vw);
   }
 }
 
@@ -136,8 +175,13 @@
     left: var(--rest);
   }
 
-  /* Sans animation, la licorne au caddie reste immobile, visible à gauche de l'écran. */
+  /* Sans animation, la licorne au caddie reste immobile, visible au bord de l'écran
+     (à gauche pour un ajout, à droite pour un retrait). */
   .cart-ride {
     transform: translateX(16px);
+  }
+
+  .cart-ride--remove {
+    transform: translateX(-16px);
   }
 }

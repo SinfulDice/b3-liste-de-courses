@@ -45,6 +45,23 @@ describe('fichiers statiques', () => {
     expect(readFileSync('src/App.tsx', 'utf8')).toContain('CART_RIDE_MS = 4000')
   })
 
+  it('R28 : au retrait, la licorne au caddie est retournée et traverse de droite à gauche', () => {
+    const css = readFileSync('src/unicorns.css', 'utf8')
+    const remove = css.slice(css.indexOf('.cart-ride--remove {'))
+    expect(remove).toContain('animation-name: ride-back')
+    expect(css).toMatch(/\.cart-ride--remove \.cart-ride-unicorn,[^{]*\{\s*scale: -1 1/)
+    const back = css.slice(css.indexOf('@keyframes ride-back'))
+    expect(back.indexOf('translateX(220px)')).toBeLessThan(back.indexOf('translateX(-100vw)'))
+  })
+
+  it('R25 : l\'aile part du dos vers l\'arrière (sa pointe est plus à gauche que sa base)', () => {
+    const svg = readFileSync('src/Unicorn.tsx', 'utf8')
+    const wing = svg.match(/d="(M64 40 [^"]+)"/)
+    expect(wing).not.toBeNull()
+    // La pointe (38, 6) est à gauche de l'attache (64, 40) : la licorne regarde vers la droite.
+    expect(wing![1]).toContain('38 6')
+  })
+
   it('R30 : le fichier du hennissement existe', () => {
     expect(existsSync('public/sounds/neigh.ogg')).toBe(true)
   })

@@ -13,6 +13,7 @@ beforeEach(() => {
 // et on revient aux vrais minuteurs (certains tests les accélèrent).
 afterEach(() => {
   cleanup()
+  localStorage.clear() // chaque test repart d'un navigateur "neuf" (R54, R57)
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
   vi.useRealTimers()

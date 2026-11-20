@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { addToList, isInList, removeFromList } from './list'
+import { apple, milk } from './test-data'
 import type { ListItem } from './types'
-
-const apple = { id: 16, title: 'Apple' }
-const milk = { id: 36, title: 'Milk' }
 
 describe('list.ts (fonctions pures)', () => {
   it('R9 : un produit absent est ajouté en bas avec la quantité 1', () => {
@@ -42,7 +40,7 @@ describe('list.ts (fonctions pures)', () => {
   it('isInList dit si un produit est déjà dans la liste', () => {
     const list: ListItem[] = [{ ...apple, quantity: 1 }]
     expect(isInList(list, 16)).toBe(true)
-    expect(isInList(list, 36)).toBe(false)
+    expect(isInList(list, 32)).toBe(false)
   })
 
   it('les fonctions ne modifient pas la liste reçue (React a besoin d\'une nouvelle liste)', () => {

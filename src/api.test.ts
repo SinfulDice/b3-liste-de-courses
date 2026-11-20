@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { addProduct, deleteProduct, fetchCatalog } from './api'
+import { apple } from './test-data'
 
 // Crée un faux fetch qui répond toujours la même chose.
 function mockFetch(body: unknown, ok = true) {
@@ -13,15 +14,15 @@ function mockFetch(body: unknown, ok = true) {
 }
 
 describe('api.ts (appels à DummyJSON)', () => {
-  it('R1 : fetchCatalog appelle la catégorie groceries et renvoie id + title', async () => {
+  it('R1 : fetchCatalog charge tout le catalogue avec prix, image et catégorie', async () => {
     const fetchMock = mockFetch({
-      products: [{ id: 16, title: 'Apple', price: 1.99 }],
+      products: [{ ...apple, rating: 4.1 }], // un champ en trop, qui doit être ignoré
     })
     const products = await fetchCatalog()
-    expect(fetchMock.mock.calls[0][0]).toContain(
-      'https://dummyjson.com/products/category/groceries',
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      'https://dummyjson.com/products?limit=0&select=title,price,thumbnail,category',
     )
-    expect(products).toEqual([{ id: 16, title: 'Apple' }])
+    expect(products).toEqual([apple])
   })
 
   it('R3 : fetchCatalog lance une erreur si la réponse n\'est pas OK', async () => {

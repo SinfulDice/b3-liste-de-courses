@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { addProduct, deleteProduct, fetchCatalog } from './api'
 import { CartUnicorn, type CartRide } from './CartUnicorn'
+import { productName } from './i18n/translate'
 import { addToList, isInList, removeFromList } from './list'
 import { playNeigh } from './sound'
+import { isBoolean, loadValue, saveValue } from './storage'
 import type { ListItem, Product } from './types'
 import { UnicornSky } from './UnicornSky'
 import './App.css'
@@ -25,6 +27,14 @@ function App() {
   // useRef garde une valeur qui ne provoque PAS de réaffichage quand elle change :
   // parfait pour un simple compteur qui fabrique des identifiants uniques.
   const nextRideKey = useRef(0)
+  // R57 : noms en français ou en anglais. On passe une FONCTION à useState : elle n'est
+  // appelée qu'au premier affichage, pour lire la sauvegarde une seule fois.
+  const [french, setFrench] = useState(() => loadValue('french', true, isBoolean))
+
+  // R57 : à chaque changement de "french", on le sauvegarde dans le navigateur.
+  useEffect(() => {
+    saveValue('french', french)
+  }, [french])
 
   // useEffect lance du code APRÈS l'affichage. Avec [] à la fin, une seule fois au démarrage.
   useEffect(() => {
@@ -65,7 +75,7 @@ function App() {
     if (isInList(list, product.id)) {
       setList((current) => addToList(current, product))
       setError(null) // R17
-      celebrate(product.title, 'add') // R27 (quantité + 1 compte aussi)
+      celebrate(productName(product, french), 'add') // R27 (quantité + 1 compte aussi)
       return
     }
 
@@ -74,7 +84,7 @@ function App() {
       await addProduct(product.title) // R9
       setList((current) => addToList(current, product))
       setError(null) // R17
-      celebrate(product.title, 'add') // R27
+      celebrate(productName(product, french), 'add') // R27
     } catch {
       setError("L'ajout a échoué. Réessaie.") // R12
     } finally {
@@ -88,9 +98,9 @@ function App() {
       await deleteProduct(item.id) // R14 : id du catalogue
       setList((current) => removeFromList(current, item.id))
       setError(null) // R17
-      celebrate(item.title, 'remove') // R28
+      celebrate(productName(item, french), 'remove') // R28
     } catch {
-      setError(`La suppression de « ${item.title} » a échoué. Réessaie.`) // R15
+      setError(`La suppression de « ${productName(item, french)} » a échoué. Réessaie.`) // R15
     } finally {
       setBusy(false)
     }
@@ -102,6 +112,18 @@ function App() {
       <UnicornSky />
       <main className="app">
         <h1>Liste de courses</h1>
+
+        {/* R57 : interrupteur de traduction. role="switch" dit aux lecteurs d'écran
+            que c'est un interrupteur marche/arrêt, pas une simple case à cocher. */}
+        <label className="toggle">
+          <input
+            type="checkbox"
+            role="switch"
+            checked={french}
+            onChange={(event) => setFrench(event.target.checked)}
+          />
+          Noms en français
+        </label>
 
         {status === 'loading' && <p>Chargement…</p>}
 
@@ -123,7 +145,7 @@ function App() {
                 <option value="">— Choisir un produit —</option>
                 {catalog.map((product) => (
                   <option key={product.id} value={product.id}>
-                    {product.title}
+                    {productName(product, french)}
                   </option>
                 ))}
               </select>
@@ -146,13 +168,13 @@ function App() {
                   // key : React a besoin d'un identifiant unique par ligne (R11 : id du catalogue).
                   <li key={item.id}>
                     <span>
-                      {item.title} × {item.quantity}
+                      {productName(item, french)} × {item.quantity}
                     </span>
                     <button
                       type="button"
                       onClick={() => handleDelete(item)}
                       disabled={busy}
-                      aria-label={`Supprimer ${item.title}`}
+                      aria-label={`Supprimer ${productName(item, french)}`}
                     >
                       Supprimer
                     </button>
