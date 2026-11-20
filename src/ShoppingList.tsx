@@ -1,6 +1,5 @@
 import { ListLine } from './ListLine'
-import { computeTotals, splitByBought } from './list'
-import { formatEuros } from './money'
+import { splitByBought } from './list'
 import type { ListItem } from './types'
 
 type Props = {
@@ -10,16 +9,17 @@ type Props = {
   onAdd: (item: ListItem, quantity: number) => Promise<boolean>
   onRemove: (item: ListItem, quantity: number) => Promise<boolean>
   onToggleBought: (item: ListItem) => void
+  favoriteIds: Set<number> // R59 : les produits favoris
+  onToggleFavorite: (item: ListItem) => void
 }
 
-// La liste de courses : lignes à acheter, lignes déjà achetées, puis le récapitulatif.
-export function ShoppingList({ items, ...lineProps }: Props) {
+// Les lignes de la liste : à acheter, puis déjà achetées (le récapitulatif est dans Summary.tsx).
+export function ShoppingList({ items, favoriteIds, ...lineProps }: Props) {
   if (items.length === 0) {
     return <p className="empty">La liste est vide</p>
   }
 
   const { toBuy, bought } = splitByBought(items) // R7
-  const totals = computeTotals(items) // R46
 
   return (
     <>
@@ -27,7 +27,7 @@ export function ShoppingList({ items, ...lineProps }: Props) {
         <ul className="list" aria-label="À acheter">
           {toBuy.map((item) => (
             // "{...lineProps}" passe d'un coup french, busy, onAdd… à chaque ligne.
-            <ListLine key={item.id} item={item} {...lineProps} />
+            <ListLine key={item.id} item={item} favorite={favoriteIds.has(item.id)} {...lineProps} />
           ))}
         </ul>
       )}
@@ -37,31 +37,11 @@ export function ShoppingList({ items, ...lineProps }: Props) {
           <h2 className="section-title">Déjà acheté</h2>
           <ul className="list" aria-label="Déjà acheté">
             {bought.map((item) => (
-              <ListLine key={item.id} item={item} {...lineProps} />
+              <ListLine key={item.id} item={item} favorite={favoriteIds.has(item.id)} {...lineProps} />
             ))}
           </ul>
         </>
       )}
-
-      {/* R46 : <dl> = liste de "termes" (dt) et de leurs "valeurs" (dd), parfait pour un récap. */}
-      <dl className="summary" aria-label="Récapitulatif">
-        <div>
-          <dt>Articles</dt>
-          <dd>{totals.count}</dd>
-        </div>
-        <div>
-          <dt>Total</dt>
-          <dd>{formatEuros(totals.total)}</dd>
-        </div>
-        <div>
-          <dt>Déjà acheté</dt>
-          <dd>{formatEuros(totals.bought)}</dd>
-        </div>
-        <div className="summary-remaining">
-          <dt>Reste à payer</dt>
-          <dd>{formatEuros(totals.remaining)}</dd>
-        </div>
-      </dl>
     </>
   )
 }

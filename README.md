@@ -4,9 +4,13 @@ Petite application web de liste de courses (projet B3) en **React + TypeScript**
 l'API publique [DummyJSON](https://dummyjson.com) comme catalogue de produits.
 Déployée sur **Red Hat OpenShift** (Developer Sandbox) : https://liste-de-courses-pierre-antoine-sut-dev.apps.rm1.0a51.p1.openshiftapps.com
 
-- **Deux pages** : *Produits* (`/`) et *Ma liste* (`/liste`), avec React Router.
-- **Produits** : tout le catalogue DummyJSON (194 produits) en grille de cartes, avec recherche
-  (sans accents, en français ou en anglais) et filtre par catégorie. On ajoute X d'un produit.
+- **Trois pages** : *Produits* (`/`), *Ma liste* (`/liste`) et *Coupons* (`/coupons`), avec React Router.
+- **Produits** : tout le catalogue DummyJSON (194 produits) en grille de cartes triées par catégorie,
+  avec recherche (sans accents, en français ou en anglais) et filtre par catégorie (boutons avec icônes
+  Lucide). On ajoute X d'un produit à la liste active.
+- **Plusieurs listes** nommées : créer, renommer, supprimer. Tout est sauvegardé dans le navigateur.
+- **Favoris** : une licorne sur chaque produit le met en favori ; chaque nouvelle liste reçoit 1 de chaque favori.
+- **Coupons** : réductions en % ou en €, sur toute la liste ou une catégorie, cochées liste par liste.
 - **Ma liste** : prix en euros, sous-totaux, récapitulatif (total, déjà acheté, reste à payer).
   Chaque ligne permet d'ajouter ou de retirer X, et de cocher « déjà acheté » (la ligne est barrée
   et descend en bas).
@@ -15,12 +19,13 @@ Déployée sur **Red Hat OpenShift** (Developer Sandbox) : https://liste-de-cour
 - Des licornes ailées volent en fond ; à chaque ajout ou retrait réussi, une licorne hennit et
   traverse l'écran en poussant un caddie « X × produit » (dans l'autre sens pour un retrait).
 
-Les règles exactes sont dans [`SPEC.md`](SPEC.md) (R1 à R57).
+Les règles exactes sont dans [`SPEC.md`](SPEC.md) (R1 à R70).
 
 ## Limites (voulues)
 
 DummyJSON **simule** les ajouts et les suppressions : rien n'est enregistré sur le serveur.
-La liste vit dans la mémoire de React et redevient vide quand on recharge la page.
+Les listes et les coupons sont sauvegardés dans le **localStorage** du navigateur : ils restent après un
+rechargement, mais seulement sur cet appareil et ce navigateur (pas de synchronisation).
 
 ## Crédits
 
@@ -45,6 +50,13 @@ npm run build      # construit le site dans dist/
 | `src/ProductsPage.tsx`, `src/ProductCard.tsx` | La page Produits et une carte de produit |
 | `src/ListPage.tsx`, `src/ShoppingList.tsx`, `src/ListLine.tsx` | La page Ma liste, ses sections et une ligne |
 | `src/QuantityPicker.tsx`, `src/quantity.ts` | Le sélecteur [−] X [+] et ses bornes 1–99 |
+| `src/ListSwitcher.tsx` | Le choix de la liste active ; créer, renommer, supprimer une liste |
+| `src/lists.ts` | Les règles des listes et des favoris, en fonctions pures |
+| `src/FavoriteButton.tsx` | Le bouton licorne des favoris |
+| `src/CouponsPage.tsx`, `src/CouponPicker.tsx`, `src/Summary.tsx` | La page Coupons, les coupons à cocher dans une liste, le récapitulatif |
+| `src/coupons.ts` | Les règles des coupons (vérification, calcul des réductions), en fonctions pures |
+| `src/CategoryFilter.tsx`, `src/CategoryIcon.tsx`, `src/categoryIcons.ts` | Les boutons de catégories et les icônes Lucide |
+| `src/savedData.ts` | Sauvegarde et relecture vérifiée de toutes les données (localStorage) |
 | `src/api.ts` | Les appels à DummyJSON (catalogue, ajout, suppression) |
 | `src/list.ts` | Les règles de la liste (ajouter, retirer, cocher, totaux), en fonctions pures |
 | `src/money.ts` | Prix en centimes et affichage en euros |
@@ -57,7 +69,7 @@ npm run build      # construit le site dans dist/
 | `src/CartUnicorn.tsx` | La licorne qui pousse un caddie après un ajout / un retrait |
 | `src/unicorns.css` | Les animations des licornes (et leur arrêt si « moins d'animations ») |
 | `src/sound.ts` | Joue le hennissement |
-| `*.test.ts(x)`, `tests/` | Les tests (93) |
+| `*.test.ts(x)`, `tests/` | Les tests (151) |
 | `nginx.conf` | Config du serveur : renvoie l'app pour toutes les adresses (pour React Router) |
 | `Dockerfile` | Image du conteneur : build Node puis nginx non-root sur le port 8080 |
 

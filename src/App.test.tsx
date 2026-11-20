@@ -82,7 +82,8 @@ async function addFromCatalog(user: User, name: string, quantity = 1) {
 
 async function goToList(user: User) {
   await user.click(screen.getByRole('link', { name: /^Ma liste/ }))
-  await screen.findByRole('heading', { name: 'Ma liste', level: 2 })
+  // On attend que le lien soit marqué « page actuelle » (le titre, lui, est le nom de la liste active).
+  await screen.findByRole('link', { name: /^Ma liste/, current: 'page' })
 }
 
 async function goToProducts(user: User) {
@@ -211,7 +212,7 @@ describe('Page Produits', () => {
     const user = userEvent.setup()
     renderApp()
     await findCard('Pomme')
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Catégorie' }), 'Smartphones')
+    await user.click(screen.getByRole('button', { name: 'Smartphones' }))
     expect(screen.getByRole('article', { name: 'iPhone X' })).toBeInTheDocument()
     expect(screen.queryByRole('article', { name: 'Pomme' })).not.toBeInTheDocument()
     await user.type(screen.getByRole('searchbox', { name: 'Rechercher' }), 'lait')
@@ -669,5 +670,342 @@ describe('Licornes', () => {
       vi.advanceTimersByTime(CART_RIDE_MS)
     })
     expect(screen.queryByTestId('cart-unicorn')).not.toBeInTheDocument()
+  })
+})
+
+// ---------- Étape 4 : listes, favoris, coupons, icônes ----------
+
+function listSelect() {
+  return screen.getByRole('combobox', { name: 'Liste active' })
+}
+
+// Ouvre « Nouvelle liste », tape le nom et valide.
+async function createListNamed(user: User, name: string) {
+  await user.click(screen.getByRole('button', { name: 'Nouvelle liste' }))
+  const form = screen.getByRole('form', { name: 'Nouvelle liste' })
+  await user.type(within(form).getByRole('textbox', { name: 'Nom de la liste' }), name)
+  await user.click(within(form).getByRole('button', { name: 'Créer' }))
+}
+
+async function goToCoupons(user: User) {
+  await user.click(screen.getByRole('link', { name: 'Coupons' }))
+  await screen.findByRole('heading', { name: 'Coupons', level: 2 })
+}
+
+// Remplit le formulaire de la page Coupons et valide.
+async function createCoupon(
+  user: User,
+  { name, kind = 'Pourcentage (%)', value, target = 'Toute la liste' }: { name: string; kind?: string; value: string; target?: string },
+) {
+  const form = screen.getByRole('form', { name: 'Nouveau coupon' })
+  await user.type(within(form).getByRole('textbox', { name: 'Nom du coupon' }), name)
+  await user.selectOptions(within(form).getByRole('combobox', { name: 'Type' }), kind)
+  await user.type(within(form).getByRole('textbox', { name: 'Valeur' }), value)
+  await user.selectOptions(within(form).getByRole('combobox', { name: "S'applique à" }), target)
+  await user.click(within(form).getByRole('button', { name: 'Créer le coupon' }))
+}
+
+describe('Plusieurs listes (R49 à R54)', () => {
+  it('R5 + R49 : au départ, le menu propose Favoris puis Ma liste (active)', async () => {
+    fakeDummyJson()
+    renderApp()
+    await findCard('Pomme')
+    const options = within(listSelect()).getAllByRole('option')
+    expect(options.map((option) => option.textContent)).toEqual(['Favoris', 'Ma liste'])
+    expect(listSelect()).toHaveDisplayValue('Ma liste')
+  })
+
+  it('R50 + R40 : créer une liste la rend active ; Produits ajoute dedans', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    renderApp()
+    await findCard('Pomme')
+    await createListNamed(user, 'Samedi')
+    expect(listSelect()).toHaveDisplayValue('Samedi')
+    expect(plainText(screen.getByText(/Ajouter à/))).toBe('Ajouter à : Samedi')
+    await addFromCatalog(user, 'Pomme', 2)
+    await screen.findByText('Dans la liste : 2')
+    // Retour sur Ma liste : elle est restée vide.
+    await user.selectOptions(listSelect(), 'Ma liste')
+    expect(screen.queryByText(/Dans la liste/)).not.toBeInTheDocument()
+  })
+
+  it('R52 : un nom déjà pris est refusé avec un message, rien n’est créé', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    renderApp()
+    await findCard('Pomme')
+    await createListNamed(user, '  ma LISTE ')
+    expect(screen.getByRole('alert')).toHaveTextContent('déjà')
+    expect(within(listSelect()).getAllByRole('option')).toHaveLength(2)
+  })
+
+  it('R51 : renommer la liste active', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    renderApp()
+    await findCard('Pomme')
+    await user.click(screen.getByRole('button', { name: 'Renommer' }))
+    const input = screen.getByRole('textbox', { name: 'Nom de la liste' })
+    expect(input).toHaveValue('Ma liste')
+    await user.clear(input)
+    await user.type(input, 'Semaine')
+    await user.click(screen.getByRole('button', { name: 'Enregistrer' }))
+    expect(listSelect()).toHaveDisplayValue('Semaine')
+  })
+
+  it('R53 : supprimer demande confirmation ; « Annuler » ne supprime rien', async () => {
+    fakeDummyJson()
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const user = userEvent.setup()
+    renderApp()
+    await findCard('Pomme')
+    await user.click(screen.getByRole('button', { name: 'Supprimer' }))
+    expect(confirm).toHaveBeenCalledWith('Supprimer la liste « Ma liste » ?')
+    expect(within(listSelect()).getAllByRole('option')).toHaveLength(2)
+  })
+
+  it('R53 : après confirmation, la liste disparaît et une autre devient active, sans appel API', async () => {
+    const fetchMock = fakeDummyJson()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const user = userEvent.setup()
+    renderApp()
+    await findCard('Pomme')
+    await createListNamed(user, 'Samedi')
+    const callsBefore = fetchMock.mock.calls.length
+    await user.click(screen.getByRole('button', { name: 'Supprimer' }))
+    expect(within(listSelect()).getAllByRole('option').map((o) => o.textContent)).toEqual(['Favoris', 'Ma liste'])
+    expect(listSelect()).toHaveDisplayValue('Ma liste')
+    expect(fetchMock.mock.calls.length).toBe(callsBefore)
+  })
+
+  it('R58 : Favoris ne peut être ni renommée ni supprimée', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    renderApp()
+    await findCard('Pomme')
+    await user.selectOptions(listSelect(), 'Favoris')
+    expect(screen.getByRole('button', { name: 'Renommer' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Supprimer' })).toBeDisabled()
+  })
+
+  it('R54 : listes, lignes, cases et liste active sont retrouvées après un rechargement', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    const { unmount } = renderApp()
+    await findCard('Pomme')
+    await createListNamed(user, 'Samedi')
+    const line = await addThenOpenList(user, 'Lait', 3)
+    await user.click(within(line).getByRole('checkbox'))
+    unmount()
+    renderApp('/liste')
+    expect(await screen.findByRole('heading', { name: 'Samedi', level: 2 })).toBeInTheDocument()
+    const reloaded = await findLine('Lait')
+    expect(plainText(reloaded)).toContain('3 × 3,49 €')
+    expect(within(reloaded).getByRole('checkbox')).toBeChecked()
+  })
+
+  it('R55 : une sauvegarde abîmée ne fait pas planter l’app', async () => {
+    localStorage.setItem('liste-de-courses:data', '{oups')
+    fakeDummyJson()
+    renderApp('/liste')
+    expect(await screen.findByText('La liste est vide')).toBeInTheDocument()
+  })
+})
+
+describe('Favoris (R58 à R61)', () => {
+  it('R59 + R60 : la licorne d’une carte met le produit en favori, puis l’enlève', async () => {
+    const fetchMock = fakeDummyJson()
+    const user = userEvent.setup()
+    renderApp()
+    const card = await findCard('Pomme')
+    const callsBefore = fetchMock.mock.calls.length
+    await user.click(within(card).getByRole('button', { name: 'Ajouter aux favoris' }))
+    const fav = within(card).getByRole('button', { name: 'Retirer des favoris' })
+    expect(fav).toHaveClass('fav--on')
+    // R60 : pas d'appel API, pas de licorne au caddie, et la liste active ne change pas.
+    expect(fetchMock.mock.calls.length).toBe(callsBefore)
+    expect(screen.queryByTestId('cart-unicorn')).not.toBeInTheDocument()
+    expect(neighCount()).toBe(0)
+    expect(screen.getByRole('link', { name: 'Ma liste 0' })).toBeInTheDocument()
+    await user.click(fav)
+    expect(within(card).getByRole('button', { name: 'Ajouter aux favoris' })).not.toHaveClass('fav--on')
+  })
+
+  it('R58 + R60 : un favori apparaît dans la liste Favoris avec la quantité 1', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    renderApp()
+    await user.click(within(await findCard('Lait')).getByRole('button', { name: 'Ajouter aux favoris' }))
+    await user.selectOptions(listSelect(), 'Favoris')
+    await user.click(screen.getByRole('link', { name: /^Ma liste/ }))
+    expect(await screen.findByRole('heading', { name: 'Favoris', level: 2 })).toBeInTheDocument()
+    expect(plainText(getLine('Lait'))).toContain('1 × 3,49 €')
+  })
+
+  it('R59 : la licorne d’une ligne marque le produit favori sur la carte aussi', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    renderApp()
+    const line = await addThenOpenList(user, 'Pomme')
+    await user.click(within(line).getByRole('button', { name: 'Ajouter aux favoris' }))
+    expect(within(getLine('Pomme')).getByRole('button', { name: 'Retirer des favoris' })).toBeInTheDocument()
+    await goToProducts(user)
+    expect(within(await findCard('Pomme')).getByRole('button', { name: 'Retirer des favoris' })).toBeInTheDocument()
+  })
+
+  it('R61 : une nouvelle liste reçoit 1 de chaque favori', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    renderApp()
+    await user.click(within(await findCard('Lait')).getByRole('button', { name: 'Ajouter aux favoris' }))
+    await user.click(within(await findCard('Pomme')).getByRole('button', { name: 'Ajouter aux favoris' }))
+    await createListNamed(user, 'Samedi')
+    await user.click(screen.getByRole('link', { name: /^Ma liste/ }))
+    await screen.findByRole('heading', { name: 'Samedi', level: 2 })
+    const lines = within(screen.getByRole('list', { name: 'À acheter' })).getAllByRole('listitem')
+    expect(lines.map((line) => line.getAttribute('aria-label'))).toEqual(['Lait', 'Pomme'])
+    expect(plainText(getLine('Pomme'))).toContain('1 × 1,99 €')
+  })
+})
+
+describe('Coupons (R62 à R67)', () => {
+  it('R35 + R37 : la page Coupons a son lien et son adresse /coupons', async () => {
+    fakeDummyJson()
+    renderApp('/coupons')
+    expect(await screen.findByRole('heading', { name: 'Coupons', level: 2 })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Coupons' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByText("Aucun coupon pour l'instant")).toBeInTheDocument()
+  })
+
+  it('R62 + R64 : créer un coupon l’affiche avec sa description', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    renderApp('/coupons')
+    await screen.findByRole('heading', { name: 'Coupons', level: 2 })
+    await createCoupon(user, { name: 'LICORNE10', value: '10', target: 'Épicerie' })
+    await createCoupon(user, { name: 'CINQ', kind: 'Montant (€)', value: '5,50' })
+    const list = screen.getByRole('list', { name: 'Mes coupons' })
+    expect(plainText(within(list).getByRole('listitem', { name: 'LICORNE10' }))).toContain('−10 % sur Épicerie')
+    expect(plainText(within(list).getByRole('listitem', { name: 'CINQ' }))).toContain('−5,50 € sur toute la liste')
+  })
+
+  it('R63 : un coupon invalide est refusé avec un message', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    renderApp('/coupons')
+    await screen.findByRole('heading', { name: 'Coupons', level: 2 })
+    await createCoupon(user, { name: 'TROP', value: '150' })
+    expect(screen.getByRole('alert')).toHaveTextContent('entre 1 et 100')
+    expect(screen.getByText("Aucun coupon pour l'instant")).toBeInTheDocument()
+  })
+
+  it('R65 : sans coupon, Ma liste propose un lien vers la page Coupons', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    renderApp()
+    await addThenOpenList(user, 'Pomme')
+    expect(screen.getByRole('link', { name: 'Créer un coupon' })).toHaveAttribute('href', '/coupons')
+  })
+
+  it('R65 + R66 + R46 : cocher un coupon baisse le reste à payer (achats compris)', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    renderApp('/coupons')
+    await screen.findByRole('heading', { name: 'Coupons', level: 2 })
+    await createCoupon(user, { name: 'MOITIE', value: '50', target: 'Épicerie' })
+    await goToProducts(user)
+    await addFromCatalog(user, 'Pomme', 3) // 5,97 €
+    await screen.findByText('Dans la liste : 3')
+    await addThenOpenList(user, 'Lait', 2) // 6,98 €
+    await user.click(within(getLine('Lait')).getByRole('checkbox')) // déjà acheté
+    expect(plainText(screen.getByLabelText('Récapitulatif'))).not.toContain('Réductions')
+    await user.click(screen.getByRole('checkbox', { name: /MOITIE/ }))
+    const summary = plainText(screen.getByLabelText('Récapitulatif'))
+    expect(summary).toContain('Total12,95 €')
+    expect(summary).toContain('Réductions−6,48 €') // 50 % de 12,95 € = 6,475 -> 6,48 €
+    expect(summary).toContain('Total après réductions6,47 €')
+    expect(summary).toContain('Déjà acheté6,98 €')
+    expect(summary).toContain('Reste à payer0,00 €') // 6,47 − 6,98 < 0 -> 0
+  })
+
+  it('R65 : un coupon coché ne vaut que pour sa liste', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    renderApp('/coupons')
+    await screen.findByRole('heading', { name: 'Coupons', level: 2 })
+    await createCoupon(user, { name: 'DIX', value: '10' })
+    await goToProducts(user)
+    await addThenOpenList(user, 'Pomme')
+    await user.click(screen.getByRole('checkbox', { name: /DIX/ }))
+    await createListNamed(user, 'Samedi')
+    await goToProducts(user)
+    await addThenOpenList(user, 'Pomme')
+    expect(screen.getByRole('checkbox', { name: /DIX/ })).not.toBeChecked()
+  })
+
+  it('R64 : supprimer un coupon le retire de la page et des listes', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    renderApp('/coupons')
+    await screen.findByRole('heading', { name: 'Coupons', level: 2 })
+    await createCoupon(user, { name: 'DIX', value: '10' })
+    await goToProducts(user)
+    await addThenOpenList(user, 'Pomme')
+    await user.click(screen.getByRole('checkbox', { name: /DIX/ }))
+    await goToCoupons(user)
+    await user.click(screen.getByRole('button', { name: 'Supprimer le coupon DIX' }))
+    expect(screen.getByText("Aucun coupon pour l'instant")).toBeInTheDocument()
+    await goToList(user)
+    expect(plainText(screen.getByLabelText('Récapitulatif'))).not.toContain('Réductions')
+  })
+
+  it('R67 + R54 : les coupons sont sauvegardés et ne déclenchent ni API ni licorne', async () => {
+    const fetchMock = fakeDummyJson()
+    const user = userEvent.setup()
+    const { unmount } = renderApp('/coupons')
+    await screen.findByRole('heading', { name: 'Coupons', level: 2 })
+    const callsBefore = fetchMock.mock.calls.length
+    await createCoupon(user, { name: 'DIX', value: '10' })
+    expect(fetchMock.mock.calls.length).toBe(callsBefore)
+    expect(screen.queryByTestId('cart-unicorn')).not.toBeInTheDocument()
+    unmount()
+    renderApp('/coupons')
+    expect(await screen.findByRole('listitem', { name: 'DIX' })).toBeInTheDocument()
+  })
+})
+
+describe('Icônes et ordre (R68 à R70)', () => {
+  it('R68 : les cartes et les lignes ont l’icône de leur catégorie, cachée aux lecteurs d’écran', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    renderApp()
+    const icon = (await findCard('Pomme')).querySelector('svg.category-icon--groceries')
+    expect(icon).toHaveAttribute('aria-hidden', 'true')
+    const line = await addThenOpenList(user, 'Pomme')
+    expect(line.querySelector('svg.category-icon--groceries')).toBeInTheDocument()
+  })
+
+  it('R69 : le filtre est une rangée de boutons ; « Toutes » est choisi au départ', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    renderApp()
+    await findCard('Pomme')
+    const group = screen.getByRole('group', { name: 'Catégorie' })
+    const buttons = within(group).getAllByRole('button')
+    expect(buttons.map((b) => b.textContent)).toEqual(['Toutes', 'Épicerie', 'Smartphones'])
+    expect(buttons[0]).toHaveAttribute('aria-pressed', 'true')
+    expect(buttons[1].querySelector('svg')).toBeInTheDocument()
+    await user.click(buttons[1])
+    expect(buttons[1]).toHaveAttribute('aria-pressed', 'true')
+    expect(buttons[0]).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('R70 : les produits sont triés par catégorie (nom français, A→Z)', async () => {
+    fakeDummyJson() // ordre DummyJSON du faux catalogue : Pomme, Lait, iPhone X
+    renderApp()
+    await findCard('Pomme')
+    const names = screen.getAllByRole('article').map((card) => card.getAttribute('aria-label'))
+    expect(names).toEqual(['Pomme', 'Lait', 'iPhone X']) // Épicerie (ordre gardé), puis Smartphones
   })
 })

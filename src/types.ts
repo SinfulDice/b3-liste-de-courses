@@ -12,3 +12,28 @@ export type ListItem = Product & {
   quantity: number
   bought: boolean // R48
 }
+
+// R49 : une liste de courses nommée. "id" ne change jamais (même si on renomme la liste).
+export type ShoppingList = {
+  id: string
+  name: string
+  items: ListItem[]
+  couponIds: string[] // R65 : les coupons cochés pour CETTE liste
+}
+
+// R62 : un coupon. "value" : un pourcentage entier (10 = −10 %) ou des centimes (500 = −5,00 €).
+export type CouponKind = 'percent' | 'euro'
+export type Coupon = {
+  id: string
+  name: string
+  kind: CouponKind
+  value: number
+  category: string // slug de la catégorie, ou '' = toute la liste
+}
+
+// Tout ce que l'app sauvegarde (R54) : les listes, la liste active et les coupons.
+export type AppData = {
+  lists: ShoppingList[]
+  activeId: string
+  coupons: Coupon[]
+}

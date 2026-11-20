@@ -4,9 +4,10 @@ Application web de liste de courses en **React + TypeScript** (Vite), qui utilis
 **DummyJSON** (https://dummyjson.com). Déployée sur **Red Hat OpenShift** (Developer Sandbox).
 
 Statut : v1 + v1.1 **validées le 2026-11-20**. v2 **validée le 2026-11-20** (+ R57 demandée à la validation).
+Ajouts de l'étape 4 (Favoris, coupons, icônes, ordre des produits : R58 à R70) : **validés le 2026-11-20**.
 
 Les règles gardent leur numéro d'origine (les tests les citent). Une règle changée en v2 est marquée
-**(v2)** ; une règle qui n'existe plus est ~~barrée~~ avec sa remplaçante.
+**(v2)** ; une règle qui n'existe plus est ~~barrée~~ avec sa remplaçante. Une règle changée par l'étape 4 est marquée **(v2.1)**.
 
 ## Rappel important sur DummyJSON
 
@@ -21,6 +22,8 @@ et des catégories sont en anglais, les prix en dollars.
 - **Liste** : une liste de courses nommée (ex : « Courses de la semaine »). Il peut y en avoir plusieurs.
 - **Liste active** : celle dans laquelle la page Produits ajoute, et que la page Ma liste affiche.
 - **Ligne** : un produit dans une liste, avec sa quantité et sa case « acheté ».
+- **Favoris** : une liste spéciale, toujours présente ; un produit est « favori » s'il a une ligne dans Favoris.
+- **Coupon** : une réduction (en % ou en €) sur toute la liste ou sur une catégorie, qu'on coche dans une liste.
 
 ## Catalogue
 
@@ -46,21 +49,25 @@ et des catégories sont en anglais, les prix en dollars.
 
 ## Deux pages (v2)
 
-- **R35** : l'app a **deux pages** avec leur propre adresse : **Produits** (`/`) et **Ma liste** (`/liste`).
+- **R35 (v2.1)** : l'app a **trois pages** avec leur propre adresse : **Produits** (`/`), **Ma liste** (`/liste`)
+  et **Coupons** (`/coupons`).
   On passe de l'une à l'autre par un menu en haut, toujours visible ; la page courante y est mise en évidence.
 - **R36** : le lien « Ma liste » affiche le **nombre d'articles** de la liste active (somme des quantités).
-- **R37** : recharger la page ou ouvrir directement `/liste` fonctionne (le serveur renvoie l'app, pas une
+- **R37** : recharger la page ou ouvrir directement `/liste` (ou `/coupons`) fonctionne (le serveur renvoie l'app, pas une
   erreur 404). Une adresse inconnue affiche la page Produits.
 
 ## Page Produits (v2)
 
 - **R38** : les produits sont affichés en **grille de cartes** : image, nom français, catégorie française, prix.
 - **R39** : un champ **Rechercher** filtre les produits par nom français ou anglais (sans tenir compte
-  des majuscules ni des accents : « epice » trouve « Épices »), et un menu **Catégorie** filtre par catégorie
+  des majuscules ni des accents : « epice » trouve « Épices »), et le filtre **Catégorie** (R69) filtre par catégorie
   (« Toutes » par défaut). Les deux filtres se combinent. Aucun résultat → « Aucun produit trouvé ».
 - **R40** : chaque carte a un **sélecteur de quantité X** (voir R43) et un bouton « Ajouter ».
   La page indique la liste dans laquelle on ajoute : « Ajouter à : <nom de la liste active> ».
 - **R41** : une carte dont le produit est déjà dans la liste active affiche « Dans la liste : N ».
+- **R70** : les produits sont triés **par catégorie, dans l'ordre alphabétique du nom français** de la catégorie
+  (« Accessoires mobiles » d'abord ; « É » est rangé avec les « E »). Dans une catégorie, l'ordre de DummyJSON
+  est gardé. Les boutons du filtre Catégorie (R69) suivent le même ordre.
 - ~~**R13**~~ : bouton « Supprimer » → remplacé par « Retirer X » (R44).
 
 ## Quantité X (v2)
@@ -82,11 +89,12 @@ et des catégories sont en anglais, les prix en dollars.
 
 ## Page Ma liste (v2)
 
-- **R5 (v2)** : au tout premier lancement, il existe une liste vide nommée « Ma liste ». Une liste vide
+- **R5 (v2.1)** : au tout premier lancement, il existe deux listes vides : « Favoris » (R58) et « Ma liste »,
+  qui est la liste active. Une liste vide
   affiche « La liste est vide » et un lien vers la page Produits.
-- **R6 (v2)** : chaque ligne affiche : image, nom français, prix unitaire, quantité, sous-total
-  (prix × quantité), une case « acheté », un sélecteur de quantité X (R43) et deux boutons
-  « Ajouter » et « Retirer ».
+- **R6 (v2.1)** : chaque ligne affiche : image, icône de catégorie (R68), nom français, prix unitaire, quantité,
+  sous-total (prix × quantité), une case « acheté », le bouton licorne des favoris (R59), un sélecteur de
+  quantité X (R43) et deux boutons « Ajouter » et « Retirer ».
 - **R7 (v2)** : les lignes **à acheter** sont en haut, dans l'ordre de leur premier ajout ; les lignes
   **cochées** sont en bas dans une section « Déjà acheté ».
 - **R44** : « Ajouter » sur une ligne ajoute X (comme R10, sans appel à l'API). « Retirer » enlève X :
@@ -100,8 +108,10 @@ et des catégories sont en anglais, les prix en dollars.
 
 - **R45** : les prix sont affichés **en euros, avec le même nombre que DummyJSON** (1.99 $ → « 1,99 € »),
   au format français (virgule, espace avant €, espace pour les milliers : « 36 999,99 € »).
-- **R46** : sous la liste, un récapitulatif affiche : **Total** (toutes les lignes), **Déjà acheté**
-  (lignes cochées) et **Reste à payer** (Total − Déjà acheté), plus le nombre d'articles.
+- **R46 (v2.1)** : sous la liste, un récapitulatif affiche : le nombre d'**articles**, **Total** (toutes les lignes),
+  **Réductions** (R66, seulement si au moins un coupon est coché), **Total après réductions** (idem),
+  **Déjà acheté** (lignes cochées) et **Reste à payer** = Total après réductions − Déjà acheté, jamais
+  en dessous de 0,00 €.
 - **R47** : les calculs sont exacts au centime (pas d'erreur du type 0,1 + 0,2 = 0,30000000000000004).
 
 ## Déjà acheté (v2)
@@ -113,19 +123,69 @@ et des catégories sont en anglais, les prix en dollars.
 ## Plusieurs listes (v2)
 
 - **R49** : un menu en haut de l'app (visible sur les deux pages) choisit la **liste active**.
-- **R50** : **Créer** une liste : on donne un nom ; la nouvelle liste est vide et devient la liste active.
+- **R50 (v2.1)** : **Créer** une liste : on donne un nom ; la nouvelle liste reçoit les favoris (R61) et devient
+  la liste active.
 - **R51** : **Renommer** la liste active.
 - **R52** : un nom de liste est nettoyé des espaces au début et à la fin, fait entre **1 et 40 caractères**,
   et doit être **unique** (sans tenir compte des majuscules). Sinon un message explique le problème et
   rien n'est créé / renommé.
-- **R53** : **Supprimer** la liste active, après une confirmation (« Supprimer la liste « X » ? »).
-  La première liste restante devient active. On ne peut pas supprimer la **dernière** liste
-  (le bouton est désactivé). Supprimer une liste ne fait pas d'appel à l'API.
+- **R53 (v2.1)** : **Supprimer** la liste active, après une confirmation (« Supprimer la liste « X » ? »).
+  La première des autres listes (hors Favoris) devient active ; s'il n'y en a plus, c'est Favoris. On ne peut pas
+  supprimer **Favoris** (R58). Supprimer une liste ne fait pas d'appel à l'API.
+
+## Favoris (étape 4)
+
+- **R58** : la liste **« Favoris »** existe toujours. Elle apparaît en premier dans le menu des listes (R49).
+  C'est une liste comme les autres (on peut la choisir comme liste active, y ajouter des produits avec R9,
+  changer les quantités, cocher, appliquer des coupons), mais on ne peut **ni la renommer ni la supprimer**
+  (boutons désactivés quand elle est active). Le nom « Favoris » est donc déjà pris (R52).
+- **R59** : chaque **carte** (page Produits) et chaque **ligne** (Ma liste) a un **bouton licorne** :
+  licorne **en couleur** si le produit est dans Favoris, **grise** sinon. Pour les lecteurs d'écran, le bouton
+  s'appelle « Ajouter aux favoris » ou « Retirer des favoris ».
+- **R60** : cliquer la licorne d'un produit **pas favori** ajoute une ligne de quantité 1 dans Favoris ;
+  cliquer celle d'un produit **favori** enlève sa ligne de Favoris (quelle que soit sa quantité). Pas d'appel
+  à l'API, pas de hennissement ni de licorne au caddie. La liste active n'est pas changée (sauf si c'est
+  Favoris elle-même : la ligne y apparaît / disparaît).
+- **R61** : quand on **crée une liste** (R50), elle reçoit **une ligne par favori**, avec la quantité **1**,
+  non cochée, dans l'ordre de Favoris. Pas d'appel à l'API. Sans favori, la nouvelle liste est vide.
+  Les listes déjà créées ne changent pas quand Favoris change.
+
+## Coupons (étape 4)
+
+- **R62** : la page **Coupons** (`/coupons`) a un formulaire pour **créer un coupon** :
+  **Nom** (ex : « LICORNE10 »), **Type** (« % » ou « € »), **Valeur**, **S'applique à** (« Toute la liste »
+  ou une des 24 catégories).
+- **R63** : un coupon est refusé, avec un message qui explique pourquoi, si : le nom (nettoyé des espaces au
+  début et à la fin) est vide, fait plus de 30 caractères, ou existe déjà (sans tenir compte des majuscules) ;
+  une valeur en % n'est pas un entier entre 1 et 100 ; une valeur en € n'est pas entre 0,01 et 999,99
+  (virgule ou point acceptés, 2 chiffres après la virgule au plus).
+- **R64** : la page liste les coupons créés, chacun avec sa description (« −10 % sur Épicerie »,
+  « −5,00 € sur toute la liste ») et un bouton « Supprimer » (sans confirmation). Supprimer un coupon le
+  retire aussi des listes où il était coché. Aucun coupon → « Aucun coupon pour l'instant ».
+- **R65** : sur Ma liste, une section **Coupons** montre tous les coupons avec une case à cocher : un coupon
+  coché s'applique à **cette liste seulement**. Aucun coupon créé → un lien vers la page Coupons.
+- **R66** : calcul de la réduction d'un coupon coché, sur **toute la liste** (lignes cochées « acheté »
+  comprises) : la base est la somme des sous-totaux des lignes concernées (toutes, ou celles de la catégorie).
+  % → base × valeur ÷ 100, arrondi au centime ; € → la valeur, sans dépasser la base (un coupon −5 € sur une
+  catégorie à 3 € enlève 3 €). Les réductions de plusieurs coupons s'additionnent (chacune calculée sur les
+  prix d'origine), sans jamais dépasser le Total. Une catégorie absente de la liste → 0,00 €.
+- **R67** : créer, supprimer, cocher ou décocher un coupon ne fait pas d'appel à l'API et ne déclenche pas de
+  licorne.
+
+## Icônes de catégories (étape 4)
+
+- **R68** : chacune des 24 catégories a une **icône SVG** de la bibliothèque **Lucide** (`lucide-react`), choisie
+  pour la représenter (ex : Épicerie → panier, Smartphones → téléphone). Une catégorie inconnue a une icône
+  générique (R34). L'icône est sur les **cartes** (à côté de la catégorie), les **lignes** (à côté du nom) et
+  les **boutons du filtre**. Elle est décorative (cachée aux lecteurs d'écran, le nom est écrit à côté).
+- **R69** : le filtre **Catégorie** (R39) est une **rangée de boutons** « icône + nom », « Toutes » en premier,
+  puis les catégories (R70). Le bouton choisi est mis en évidence. Sur mobile, la rangée défile de côté
+  sans créer de défilement horizontal de la page.
 
 ## Sauvegarde (v2)
 
 - ~~**R16**~~ : liste perdue au rechargement → remplacée par R54.
-- **R54** : les listes (noms, lignes, quantités, cases cochées) et la liste active sont **sauvegardées dans
+- **R54 (v2.1)** : les listes (noms, lignes, quantités, cases cochées, coupons cochés), la liste active et les coupons sont **sauvegardées dans
   le navigateur** (localStorage) à chaque changement, et retrouvées au rechargement. Seulement sur cet
   appareil et ce navigateur.
 - **R55** : si la sauvegarde est absente, illisible ou abîmée, l'app démarre comme au premier lancement (R5),
@@ -161,8 +221,8 @@ et des catégories sont en anglais, les prix en dollars.
   poussant un caddie traverse l'écran **de gauche à droite** ; le caddie porte « X × nom français ».
 - **R28 (v2)** : après un **retrait réussi** (« Retirer », partiel ou complet), même hennissement, mais la licorne
   est **tournée vers la gauche** et traverse **de droite à gauche** ; le nom sur le caddie est barré.
-- **R29** : si l'action échoue, pas de hennissement ni de licorne au caddie. Cocher « acheté », créer,
-  renommer ou supprimer une liste ne déclenche pas de licorne.
+- **R29 (v2.1)** : si l'action échoue, pas de hennissement ni de licorne au caddie. Cocher « acheté », créer,
+  renommer ou supprimer une liste, les favoris (R60) et les coupons (R67) ne déclenchent pas de licorne.
 - **R30** : le son est `public/sounds/neigh.ogg` (« Wiehern.ogg », Wikimedia Commons, domaine public).
   S'il ne peut pas être joué, rien ne casse. Pas de bouton pour couper le son.
 - **R31** : chaque licorne au caddie disparaît après **4 secondes** ; plusieurs peuvent passer en même temps.
@@ -171,5 +231,6 @@ et des catégories sont en anglais, les prix en dollars.
 
 - Synchroniser les listes entre appareils (il faudrait un vrai serveur avec une base de données).
 - Partager une liste.
+- Coupons avec date d'expiration ou montant minimum d'achat.
 - Dupliquer une liste.
 - Mettre le son en MP3 en plus de l'OGG (Safari sur iPhone).

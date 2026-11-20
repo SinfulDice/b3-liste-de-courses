@@ -2,10 +2,26 @@ import { useEffect, useRef, useState } from 'react'
 import { NavLink, Navigate, Route, Routes } from 'react-router'
 import { addProduct, deleteProduct, fetchCatalog } from './api'
 import { CartUnicorn, type CartRide } from './CartUnicorn'
+import { addCoupon, deleteCoupon, toggleCouponInList } from './coupons'
+import { CouponsPage } from './CouponsPage'
 import { productName } from './i18n/translate'
 import { ListPage } from './ListPage'
+import { ListSwitcher } from './ListSwitcher'
 import { addToList, computeTotals, isInList, removeQuantity, removesWholeLine, toggleBought } from './list'
+import {
+  activeList,
+  createList,
+  deleteList,
+  favoritesList,
+  makeId,
+  renameList,
+  setActive,
+  toggleFavorite,
+  updateItems,
+} from './lists'
 import { ProductsPage } from './ProductsPage'
+import { loadAppData, saveAppData } from './savedData'
+import { categoriesOf } from './search'
 import { playNeigh } from './sound'
 import { isBoolean, loadValue, saveValue } from './storage'
 import type { ListItem, Product } from './types'
@@ -18,14 +34,13 @@ export const CART_RIDE_MS = 4000
 // État du chargement du catalogue : en cours, raté ou prêt.
 type CatalogStatus = 'loading' | 'error' | 'ready'
 
-// Nom de la liste (une seule pour l'instant ; plusieurs listes à l'étape 4).
-const LIST_NAME = 'Ma liste'
-
 function App() {
   // useState garde une valeur entre deux affichages ; quand on la change, React réaffiche.
   const [catalog, setCatalog] = useState<Product[]>([])
   const [status, setStatus] = useState<CatalogStatus>('loading')
-  const [items, setItems] = useState<ListItem[]>([]) // R5 : commence vide
+  // R54 : TOUTES les données (listes, liste active, coupons) dans un seul état, lu une fois au
+  // démarrage depuis la sauvegarde (R55 : premier lancement si elle manque ou est abîmée).
+  const [data, setData] = useState(loadAppData)
   const [busy, setBusy] = useState(false) // R18 : un appel à l'API est en cours
   const [error, setError] = useState<string | null>(null)
   const [rides, setRides] = useState<CartRide[]>([]) // licornes au caddie en train de passer
@@ -40,6 +55,22 @@ function App() {
   useEffect(() => {
     saveValue('french', french)
   }, [french])
+
+  // R54 : à chaque changement des données, on les sauvegarde.
+  useEffect(() => {
+    saveAppData(data)
+  }, [data])
+
+  // Valeurs "dérivées" : calculées à chaque affichage à partir de data, jamais stockées en double.
+  const active = activeList(data)
+  const items = active.items
+  // R59 : un Set (ensemble) des ids favoris : savoir si un id y est (has) est immédiat.
+  const favoriteIds = new Set(favoritesList(data).items.map((item) => item.id))
+
+  // Change les lignes d'UNE liste (par son id) avec une fonction de list.ts.
+  function changeItems(listId: string, change: (items: ListItem[]) => ListItem[]) {
+    setData((current) => updateItems(current, listId, change))
+  }
 
   // useEffect lance du code APRÈS l'affichage. Avec [] à la fin, une seule fois au démarrage.
   useEffect(() => {
@@ -75,10 +106,11 @@ function App() {
   // Renvoie true si l'ajout a réussi (pour remettre X à 1, R43).
   async function addQuantity(product: Product, amount: number): Promise<boolean> {
     const label = `${amount} × ${productName(product, french)}` // R27 : « 2 × Pomme »
+    const listId = active.id // la liste où l'on a cliqué (même si on en change pendant l'appel API)
 
     // R10 : déjà dans la liste -> quantité + X, sans appel API (DummyJSON ignore la quantité).
     if (isInList(items, product.id)) {
-      setItems((current) => addToList(current, product, amount))
+      changeItems(listId, (current) => addToList(current, product, amount))
       setError(null) // R17
       celebrate(label, 'add')
       return true
@@ -87,7 +119,7 @@ function App() {
     setBusy(true)
     try {
       await addProduct(product.title) // R9 : on envoie le nom anglais, celui de DummyJSON
-      setItems((current) => addToList(current, product, amount))
+      changeItems(listId, (current) => addToList(current, product, amount))
       setError(null) // R17
       celebrate(label, 'add') // R27
       return true
@@ -105,9 +137,10 @@ function App() {
     const name = productName(item, french)
     const removed = Math.min(amount, item.quantity) // on ne peut pas retirer plus qu'il n'y en a
     const label = `${removed} × ${name}`
+    const listId = active.id
 
     if (!removesWholeLine(items, item.id, amount)) {
-      setItems((current) => removeQuantity(current, item.id, amount))
+      changeItems(listId, (current) => removeQuantity(current, item.id, amount))
       setError(null) // R17
       celebrate(label, 'remove') // R28
       return true
@@ -116,7 +149,7 @@ function App() {
     setBusy(true)
     try {
       await deleteProduct(item.id) // R14 : id du catalogue
-      setItems((current) => removeQuantity(current, item.id, amount))
+      changeItems(listId, (current) => removeQuantity(current, item.id, amount))
       setError(null) // R17
       celebrate(label, 'remove') // R28
       return true
@@ -135,7 +168,7 @@ function App() {
     <>
       <UnicornSky />
       <div className="app">
-        {/* En-tête commun aux deux pages (R35, R57). */}
+        {/* En-tête commun aux trois pages (R35, R49, R57). */}
         <header className="header">
           <h1>Liste de courses</h1>
           {/* R35 : NavLink = un lien qui sait s'il pointe vers la page actuelle : il reçoit alors
@@ -148,6 +181,7 @@ function App() {
             <NavLink to="/liste">
               Ma liste <span className="badge">{itemCount}</span>
             </NavLink>
+            <NavLink to="/coupons">Coupons</NavLink>
           </nav>
           {/* R57 : interrupteur de traduction. role="switch" dit aux lecteurs d'écran
               que c'est un interrupteur marche/arrêt, pas une simple case à cocher. */}
@@ -160,6 +194,15 @@ function App() {
             />
             Noms en français
           </label>
+          {/* R49 à R53 : choix de la liste active et gestion des listes. */}
+          <ListSwitcher
+            lists={data.lists}
+            activeId={data.activeId}
+            onSelect={(id) => setData((current) => setActive(current, id))}
+            onCreate={(name) => setData((current) => createList(current, name))}
+            onRename={(name) => setData((current) => renameList(current, current.activeId, name))}
+            onDelete={() => setData((current) => deleteList(current, current.activeId))}
+          />
         </header>
 
         <main>
@@ -186,10 +229,12 @@ function App() {
                   <ProductsPage
                     catalog={catalog}
                     items={items}
-                    listName={LIST_NAME}
+                    listName={active.name}
                     french={french}
                     busy={busy}
                     onAdd={addQuantity}
+                    favoriteIds={favoriteIds}
+                    onToggleFavorite={(product) => setData((current) => toggleFavorite(current, product))}
                   />
                 }
               />
@@ -197,13 +242,32 @@ function App() {
                 path="/liste"
                 element={
                   <ListPage
-                    items={items}
-                    listName={LIST_NAME}
+                    list={active}
+                    coupons={data.coupons}
                     french={french}
                     busy={busy}
+                    favoriteIds={favoriteIds}
                     onAdd={addQuantity}
                     onRemove={removeAmount}
-                    onToggleBought={(item) => setItems((current) => toggleBought(current, item.id))}
+                    onToggleBought={(item) => changeItems(active.id, (current) => toggleBought(current, item.id))}
+                    onToggleFavorite={(item) => setData((current) => toggleFavorite(current, item))}
+                    onToggleCoupon={(couponId) =>
+                      setData((current) => toggleCouponInList(current, current.activeId, couponId))
+                    }
+                  />
+                }
+              />
+              <Route
+                path="/coupons"
+                element={
+                  <CouponsPage
+                    coupons={data.coupons}
+                    categories={categoriesOf(catalog)}
+                    french={french}
+                    onCreate={(coupon) =>
+                      setData((current) => addCoupon(current, { ...coupon, id: makeId() }))
+                    }
+                    onDelete={(couponId) => setData((current) => deleteCoupon(current, couponId))}
                   />
                 }
               />

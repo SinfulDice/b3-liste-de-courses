@@ -29,11 +29,20 @@ export function filterProducts(products: Product[], query: string, category: str
   )
 }
 
+// R70 : trie les produits par nom français de catégorie (A→Z). "sort" est "stable" en JavaScript :
+// deux produits de la même catégorie gardent leur ordre DummyJSON. On copie d'abord ([...products])
+// car sort() modifie le tableau, et on ne touche jamais aux données d'origine.
+export function sortByCategory(products: Product[]): Product[] {
+  return [...products].sort((a, b) => compareCategories(a.category, b.category))
+}
+
+function compareCategories(a: string, b: string): number {
+  return (CATEGORY_NAMES_FR[a] ?? a).localeCompare(CATEGORY_NAMES_FR[b] ?? b, 'fr')
+}
+
 // R39 : la liste des catégories présentes dans le catalogue, sans doublons,
 // triée par nom français (localeCompare sait trier « É » avec les « E »).
 export function categoriesOf(products: Product[]): string[] {
   const slugs = [...new Set(products.map((product) => product.category))]
-  return slugs.sort((a, b) =>
-    (CATEGORY_NAMES_FR[a] ?? a).localeCompare(CATEGORY_NAMES_FR[b] ?? b, 'fr'),
-  )
+  return slugs.sort(compareCategories)
 }

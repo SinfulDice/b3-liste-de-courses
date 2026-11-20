@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { CategoryIcon } from './CategoryIcon'
+import { FavoriteButton } from './FavoriteButton'
 import { productName } from './i18n/translate'
 import { lineTotal } from './list'
 import { formatEuros, toCents } from './money'
@@ -13,11 +15,22 @@ type Props = {
   onAdd: (item: ListItem, quantity: number) => Promise<boolean>
   onRemove: (item: ListItem, quantity: number) => Promise<boolean>
   onToggleBought: (item: ListItem) => void
+  favorite: boolean // R59
+  onToggleFavorite: (item: ListItem) => void
 }
 
 // R6 : une ligne de la liste : image, nom, prix unitaire × quantité, sous-total,
 // case « acheté », sélecteur X et boutons Ajouter / Retirer.
-export function ListLine({ item, french, busy, onAdd, onRemove, onToggleBought }: Props) {
+export function ListLine({
+  item,
+  french,
+  busy,
+  onAdd,
+  onRemove,
+  onToggleBought,
+  favorite,
+  onToggleFavorite,
+}: Props) {
   // Chaque ligne a son propre X (1 par défaut). Il vit ici : le reste de l'app n'en a pas besoin.
   const [quantity, setQuantity] = useState(1)
   const name = productName(item, french)
@@ -33,9 +46,11 @@ export function ListLine({ item, french, busy, onAdd, onRemove, onToggleBought }
             checked={item.bought}
             onChange={() => onToggleBought(item)}
           />
+          <CategoryIcon slug={item.category} /> {/* R68 */}
           {/* R48 : le nom est barré via le CSS quand la ligne est cochée. */}
           <span className="line-name">{name}</span>
         </label>
+        <FavoriteButton favorite={favorite} onToggle={() => onToggleFavorite(item)} />
         <p className="line-price">
           {item.quantity} × {formatEuros(toCents(item.price))} ={' '}
           <strong>{formatEuros(lineTotal(item))}</strong>

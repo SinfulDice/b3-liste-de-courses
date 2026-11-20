@@ -41,7 +41,8 @@ h2 {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
+  padding: 8px 12px;
+  white-space: nowrap; /* « Ma liste » ne se coupe jamais en deux lignes */
   border-radius: 8px;
   color: var(--text);
   font-weight: 600;
@@ -70,8 +71,8 @@ h2 {
   color: #fff;
 }
 
-/* La page Ma liste reste étroite : une liste trop large se lit mal. */
-section[aria-labelledby='list-title'] {
+/* Ma liste et Coupons restent étroites : une liste trop large se lit mal. */
+.narrow {
   max-width: 640px;
   margin: 0 auto;
 }
@@ -121,6 +122,7 @@ section[aria-labelledby='list-title'] {
 }
 
 .card {
+  position: relative; /* R59 : la licorne des favoris se place par rapport à la carte */
   display: flex;
   flex-direction: column;
   overflow: hidden; /* l'image ne dépasse pas des coins arrondis */
@@ -147,6 +149,12 @@ section[aria-labelledby='list-title'] {
 .card-name {
   margin: 0;
   font-size: 1rem;
+}
+
+.card-category {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .card-category,
@@ -415,4 +423,281 @@ button:disabled {
   width: 18px;
   height: 18px;
   accent-color: var(--accent); /* la couleur de la case cochée */
+}
+
+/* ---------- Étape 4 ---------- */
+
+/* Bouton secondaire : fond clair, bordure (pour ne pas voler la vedette aux boutons verts). */
+.btn-light {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-light:hover:not(:disabled) {
+  background: var(--bg);
+}
+
+.btn-light-danger {
+  color: var(--danger);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+/* R68 : l'icône de catégorie suit la couleur du texte (Lucide dessine avec "currentColor"). */
+.category-icon {
+  flex-shrink: 0; /* elle ne s'écrase jamais quand la place manque */
+  color: var(--muted);
+}
+
+/* R49 à R53 : le choix de la liste, sur toute la largeur de l'en-tête. */
+.lists {
+  width: 100%;
+}
+
+.lists-row,
+.lists-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.lists-select,
+.lists-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 200px;
+  font-weight: 600;
+}
+
+.lists-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lists-form {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.lists-form .error {
+  width: 100%;
+  margin: 0;
+}
+
+.lists-select select,
+.lists-form input,
+.coupon-form input,
+.coupon-form select {
+  padding: 10px;
+  font-size: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+}
+
+/* R59 : le bouton licorne. Gris et pâle quand le produit n'est pas favori. */
+.fav {
+  display: grid;
+  place-items: center;
+  width: 44px; /* 44px : la taille minimale conseillée pour un bouton qu'on touche du doigt */
+  height: 44px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+}
+
+.fav:hover:not(:disabled) {
+  background: var(--bg);
+}
+
+.fav-unicorn {
+  width: 100%;
+  height: 100%;
+  /* "filter" change le rendu de l'image : grayscale(1) = tout en gris. */
+  filter: grayscale(1);
+  opacity: 0.6;
+  transition: filter 0.2s, opacity 0.2s;
+}
+
+.fav--on {
+  border-color: #ff8fc7;
+}
+
+.fav--on .fav-unicorn {
+  filter: none;
+  opacity: 1;
+}
+
+/* Sur une carte, la licorne flotte en haut à droite de l'image. */
+.card .fav {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+/* Sur une ligne, elle se met au bout de la ligne du nom. */
+.line-info {
+  position: relative;
+  padding-right: 52px;
+}
+
+.line-info .fav {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+.line-check .category-icon {
+  margin-right: 2px;
+}
+
+/* R69 : la rangée de boutons de catégories. Elle défile de côté (overflow-x: auto) au lieu de faire
+   déborder toute la page ; "nowrap" garde les boutons sur une seule ligne. */
+.chips-wrap {
+  margin-bottom: 16px;
+}
+
+.chips-label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 6px; /* de la place pour la barre de défilement */
+  scrollbar-width: thin;
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text);
+}
+
+.chip:hover:not(:disabled) {
+  background: var(--bg);
+}
+
+.chip[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.chip[aria-pressed='true'] .category-icon {
+  color: #fff;
+}
+
+/* R62 : formulaire de la page Coupons, en grille de 2 colonnes (1 sur mobile). */
+.coupon-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.coupon-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 600;
+}
+
+/* grid-column: 1 / -1 = "de la première à la dernière colonne" : toute la largeur. */
+.coupon-form button,
+.coupon-form .error {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.coupon-list,
+.coupon-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.coupon {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.coupon-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.coupon-text span {
+  color: var(--muted);
+}
+
+/* R65 : les coupons à cocher dans Ma liste. */
+.coupons-picker {
+  margin-top: 16px;
+}
+
+.coupon-checks li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: var(--card);
+}
+
+.coupon-checks label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.coupon-checks input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.coupon-amount,
+.summary-discount dd {
+  color: var(--accent);
+  font-weight: 700;
 }

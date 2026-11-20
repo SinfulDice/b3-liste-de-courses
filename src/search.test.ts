@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { categoriesOf, filterProducts, matchesSearch, normalizeText } from './search'
+import { categoriesOf, filterProducts, matchesSearch, normalizeText, sortByCategory } from './search'
 import { apple, milk } from './test-data'
 
 const iphone = { ...apple, id: 124, title: 'iPhone X', category: 'smartphones' }
@@ -31,5 +31,20 @@ describe('search.ts', () => {
   it('R39 : la liste des catégories est sans doublon et triée par nom français', () => {
     // Cuisine, Épicerie, Smartphones (« É » est trié avec les « E »)
     expect(categoriesOf(products)).toEqual(['kitchen-accessories', 'groceries', 'smartphones'])
+  })
+})
+
+describe('R70 : ordre des produits', () => {
+  it('R70 : trié par nom français de catégorie ; ordre DummyJSON gardé dans une catégorie', () => {
+    const banana = { ...apple, id: 99, title: 'Banana' }
+    const sorted = sortByCategory([iphone, apple, spiceRack, milk, banana])
+    // Cuisine (épices), Épicerie (pomme, lait, banane dans l'ordre d'origine), Smartphones
+    expect(sorted.map((p) => p.title)).toEqual(['Spice Rack', 'Apple', 'Milk', 'Banana', 'iPhone X'])
+  })
+
+  it("R70 : sortByCategory ne modifie pas le tableau d'origine", () => {
+    const original = [iphone, apple]
+    sortByCategory(original)
+    expect(original).toEqual([iphone, apple])
   })
 })
