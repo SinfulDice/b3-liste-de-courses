@@ -2,7 +2,7 @@
 
 Petite application web de liste de courses (projet B3) en **React + TypeScript**, qui utilise
 l'API publique [DummyJSON](https://dummyjson.com) comme catalogue de produits.
-Déployée sur **Red Hat OpenShift** (Developer Sandbox).
+Déployée sur **Red Hat OpenShift** (Developer Sandbox) : https://liste-de-courses-pierre-antoine-sut-dev.apps.rm1.0a51.p1.openshiftapps.com
 
 - On choisit un produit dans le catalogue (catégorie *groceries* de DummyJSON) et on l'ajoute.
 - Ajouter un produit déjà présent augmente sa quantité de 1.
