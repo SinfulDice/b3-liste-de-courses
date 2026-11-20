@@ -1,5 +1,7 @@
 /* R20 : une colonne centrée, max 560px ; sur mobile elle prend toute la largeur moins 16px de chaque côté. */
 .app {
+  position: relative; /* R25 : le contenu passe au-dessus du ciel de licornes (z-index 0) */
+  z-index: 1;
   max-width: 560px;
   margin: 0 auto;
   padding: 32px 16px;

@@ -1,0 +1,143 @@
+/* ---------- R25 : le ciel de licornes, en fond ---------- */
+
+/* Couche fixe qui couvre tout l'écran, DERRIÈRE le contenu (z-index 0, le contenu est à 1). */
+.sky {
+  position: fixed;
+  inset: 0; /* = top: 0; right: 0; bottom: 0; left: 0 */
+  z-index: 0;
+  overflow: hidden; /* une licorne hors de l'écran ne crée pas de barre de défilement */
+  pointer-events: none; /* les clics passent à travers : on ne bloque jamais les boutons */
+  opacity: 0.45; /* discrètes, pour que la liste reste lisible */
+}
+
+/* Chaque licorne : la boîte extérieure avance de gauche à droite... */
+.flyer {
+  position: absolute;
+  top: var(--top);
+  left: 0;
+  width: var(--size);
+  animation: fly-across var(--duration) linear var(--delay) infinite;
+}
+
+/* ...et le dessin à l'intérieur monte et descend : les deux mouvements ensemble font une vague.
+   On les sépare sur deux éléments, sinon le second "transform" écraserait le premier. */
+.flyer-body {
+  display: block;
+  width: 100%;
+  height: auto;
+  animation: bob 2.4s ease-in-out infinite alternate;
+}
+
+@keyframes fly-across {
+  from {
+    transform: translateX(-150px); /* départ juste à gauche de l'écran */
+  }
+  to {
+    transform: translateX(100vw); /* arrivée juste à droite (vw = % de la largeur de l'écran) */
+  }
+}
+
+@keyframes bob {
+  from {
+    transform: translateY(-12px) rotate(-4deg);
+  }
+  to {
+    transform: translateY(12px) rotate(4deg);
+  }
+}
+
+/* ---------- R27 / R28 / R31 : la licorne qui pousse un caddie ---------- */
+
+/* Couche fixe en bas de l'écran, DEVANT le contenu, mais qui laisse passer les clics. */
+.cart-rides {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 12px;
+  height: 110px;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.cart-ride {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: flex-end;
+  /* 4s = la même durée que le minuteur qui l'enlève dans App.tsx (R31). */
+  animation: ride-across 4s linear forwards;
+}
+
+.cart-ride-unicorn {
+  width: 110px;
+  height: auto;
+  animation: bob 0.3s ease-in-out infinite alternate; /* petits sauts rapides = elle court */
+}
+
+.cart-ride-cart {
+  position: relative;
+  width: 80px;
+  /* Négatif : le dessin de la licorne a du vide à droite ; on colle le caddie contre son museau. */
+  margin-left: -26px;
+  margin-bottom: 4px;
+}
+
+.cart-ride-cart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Le nom du produit, posé dans le panier du caddie. */
+.cart-ride-label {
+  position: absolute;
+  left: 16px;
+  bottom: 40px;
+  max-width: 140px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #ffd257;
+  color: #3a2a4f;
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; /* nom trop long -> "Chicken Me…" */
+}
+
+/* R28 : suppression -> nom barré. */
+.cart-ride--remove .cart-ride-label {
+  text-decoration: line-through;
+  background: #ffd0d0;
+}
+
+@keyframes ride-across {
+  from {
+    transform: translateX(-220px);
+  }
+  to {
+    transform: translateX(100vw);
+  }
+}
+
+/* ---------- R26 / R31 : « moins d'animations » demandé par le système ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .flyer,
+  .flyer-body,
+  .cart-ride,
+  .cart-ride-unicorn {
+    animation: none;
+  }
+
+  /* Sans animation, chaque licorne du fond reste posée à sa place de repos. */
+  .flyer {
+    left: var(--rest);
+  }
+
+  /* Sans animation, la licorne au caddie reste immobile, visible à gauche de l'écran. */
+  .cart-ride {
+    transform: translateX(16px);
+  }
+}

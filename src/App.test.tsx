@@ -1,7 +1,8 @@
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import App from './App'
+import App, { CART_RIDE_MS } from './App'
+import { NEIGH_URL } from './sound'
 
 const CATALOG = {
   products: [
@@ -232,5 +233,126 @@ describe('App', () => {
     fakeDummyJson()
     render(<App />)
     expect(await screen.findByRole('heading', { name: 'Liste de courses' })).toBeInTheDocument()
+  })
+})
+
+// Le faux audio.play() installé dans setupTests.ts : on lit combien de fois il a été appelé.
+function neighCount() {
+  return vi.mocked(HTMLMediaElement.prototype.play).mock.calls.length
+}
+
+describe('Licornes (v1.1)', () => {
+  it('R25 : 6 licornes SVG volent en fond, cachées aux lecteurs d\'écran', async () => {
+    fakeDummyJson()
+    render(<App />)
+    await screen.findByLabelText('Produit')
+    const sky = screen.getByTestId('sky')
+    expect(sky).toHaveAttribute('aria-hidden', 'true')
+    expect(sky.querySelectorAll('.flyer svg')).toHaveLength(6)
+  })
+
+  it('R25 : les licornes du fond ne gênent pas l\'utilisation de la liste', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    render(<App />)
+    await addFromCatalog(user, 'Apple')
+    expect(await within(getList()).findByText('Apple × 1')).toBeInTheDocument()
+  })
+
+  it('R27 : un ajout réussi fait hennir et passer une licorne au caddie avec le nom du produit', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    render(<App />)
+    await addFromCatalog(user, 'Apple')
+    const ride = await screen.findByTestId('cart-unicorn')
+    expect(ride).toHaveTextContent('Apple')
+    expect(ride).toHaveClass('cart-ride--add')
+    expect(neighCount()).toBe(1)
+  })
+
+  it('R27 : quantité + 1 fait aussi hennir et passer une licorne au caddie', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    render(<App />)
+    await addFromCatalog(user, 'Apple')
+    await within(getList()).findByText('Apple × 1')
+    await addFromCatalog(user, 'Apple')
+    await within(getList()).findByText('Apple × 2')
+    expect(screen.getAllByTestId('cart-unicorn')).toHaveLength(2)
+    expect(neighCount()).toBe(2)
+  })
+
+  it('R28 : une suppression réussie fait hennir et passer une licorne au caddie, nom barré', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    render(<App />)
+    await addFromCatalog(user, 'Apple')
+    await within(getList()).findByText('Apple × 1')
+    await user.click(screen.getByRole('button', { name: 'Supprimer Apple' }))
+    await screen.findByText('La liste est vide')
+    const removeRide = document.querySelector('.cart-ride--remove')
+    expect(removeRide).toHaveTextContent('Apple')
+    expect(neighCount()).toBe(2) // 1 pour l'ajout + 1 pour la suppression
+  })
+
+  it('R29 : un ajout raté ne fait ni hennir ni passer de licorne au caddie', async () => {
+    fakeDummyJson({ addOk: false })
+    const user = userEvent.setup()
+    render(<App />)
+    await addFromCatalog(user, 'Apple')
+    await screen.findByRole('alert')
+    expect(screen.queryByTestId('cart-unicorn')).not.toBeInTheDocument()
+    expect(neighCount()).toBe(0)
+  })
+
+  it('R29 : une suppression ratée ne fait ni hennir ni passer de licorne au caddie', async () => {
+    fakeDummyJson({ deleteOk: false })
+    const user = userEvent.setup()
+    render(<App />)
+    await addFromCatalog(user, 'Apple')
+    await within(getList()).findByText('Apple × 1')
+    await user.click(screen.getByRole('button', { name: 'Supprimer Apple' }))
+    await screen.findByRole('alert')
+    expect(document.querySelector('.cart-ride--remove')).toBeNull()
+    expect(neighCount()).toBe(1) // seulement celui de l'ajout
+  })
+
+  it('R30 : le son joué est le fichier du hennissement', async () => {
+    fakeDummyJson()
+    const user = userEvent.setup()
+    render(<App />)
+    await addFromCatalog(user, 'Apple')
+    await screen.findByTestId('cart-unicorn')
+    const audio = vi.mocked(HTMLMediaElement.prototype.play).mock.contexts[0] as HTMLAudioElement
+    expect(audio.src).toContain(NEIGH_URL)
+  })
+
+  it('R30 : si le navigateur refuse de jouer le son, rien ne casse et aucune erreur n\'est affichée', async () => {
+    vi.mocked(HTMLMediaElement.prototype.play).mockRejectedValue(new Error('NotSupportedError'))
+    fakeDummyJson()
+    const user = userEvent.setup()
+    render(<App />)
+    await addFromCatalog(user, 'Apple')
+    expect(await within(getList()).findByText('Apple × 1')).toBeInTheDocument()
+    expect(screen.getByTestId('cart-unicorn')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('R31 : la licorne au caddie disparaît après 4 secondes ; plusieurs peuvent passer en même temps', async () => {
+    // Faux minuteurs : on avance le temps nous-mêmes au lieu d'attendre 4 vraies secondes.
+    // shouldAdvanceTime laisse quand même le temps avancer tout seul, ce dont userEvent a besoin.
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    fakeDummyJson()
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(<App />)
+    await addFromCatalog(user, 'Apple')
+    await within(getList()).findByText('Apple × 1')
+    await addFromCatalog(user, 'Milk')
+    await within(getList()).findByText('Milk × 1')
+    expect(screen.getAllByTestId('cart-unicorn')).toHaveLength(2)
+    act(() => {
+      vi.advanceTimersByTime(CART_RIDE_MS)
+    })
+    expect(screen.queryByTestId('cart-unicorn')).not.toBeInTheDocument()
   })
 })

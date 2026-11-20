@@ -1,8 +1,14 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { addProduct, deleteProduct, fetchCatalog } from './api'
+import { CartUnicorn, type CartRide } from './CartUnicorn'
 import { addToList, isInList, removeFromList } from './list'
+import { playNeigh } from './sound'
 import type { ListItem, Product } from './types'
+import { UnicornSky } from './UnicornSky'
 import './App.css'
+
+// R31 : durée d'un passage de licorne au caddie (la même que l'animation CSS ride-across).
+export const CART_RIDE_MS = 4000
 
 // État du chargement du catalogue : en cours, raté ou prêt.
 type CatalogStatus = 'loading' | 'error' | 'ready'
@@ -15,6 +21,10 @@ function App() {
   const [selectedId, setSelectedId] = useState('') // '' = aucun produit choisi
   const [busy, setBusy] = useState(false) // R18 : un appel à l'API est en cours
   const [error, setError] = useState<string | null>(null)
+  const [rides, setRides] = useState<CartRide[]>([]) // licornes au caddie en train de passer
+  // useRef garde une valeur qui ne provoque PAS de réaffichage quand elle change :
+  // parfait pour un simple compteur qui fabrique des identifiants uniques.
+  const nextRideKey = useRef(0)
 
   // useEffect lance du code APRÈS l'affichage. Avec [] à la fin, une seule fois au démarrage.
   useEffect(() => {
@@ -34,6 +44,18 @@ function App() {
     }
   }, [])
 
+  // R27 / R28 : hennissement + licorne au caddie, appelé seulement après une action RÉUSSIE (R29).
+  function celebrate(title: string, kind: CartRide['kind']) {
+    playNeigh()
+    const key = nextRideKey.current++
+    setRides((current) => [...current, { key, title, kind }])
+    // R31 : on retire cette licorne-là (et seulement elle) après 4 secondes.
+    // Un minuteur plutôt que la fin de l'animation CSS : sans animation (R26), il n'y a pas de "fin".
+    setTimeout(() => {
+      setRides((current) => current.filter((ride) => ride.key !== key))
+    }, CART_RIDE_MS)
+  }
+
   async function handleAdd(event: FormEvent) {
     event.preventDefault() // empêche le formulaire de recharger la page
     const product = catalog.find((p) => String(p.id) === selectedId)
@@ -43,6 +65,7 @@ function App() {
     if (isInList(list, product.id)) {
       setList((current) => addToList(current, product))
       setError(null) // R17
+      celebrate(product.title, 'add') // R27 (quantité + 1 compte aussi)
       return
     }
 
@@ -51,6 +74,7 @@ function App() {
       await addProduct(product.title) // R9
       setList((current) => addToList(current, product))
       setError(null) // R17
+      celebrate(product.title, 'add') // R27
     } catch {
       setError("L'ajout a échoué. Réessaie.") // R12
     } finally {
@@ -64,6 +88,7 @@ function App() {
       await deleteProduct(item.id) // R14 : id du catalogue
       setList((current) => removeFromList(current, item.id))
       setError(null) // R17
+      celebrate(item.title, 'remove') // R28
     } catch {
       setError(`La suppression de « ${item.title} » a échoué. Réessaie.`) // R15
     } finally {
@@ -72,69 +97,79 @@ function App() {
   }
 
   return (
-    <main className="app">
-      <h1>Liste de courses</h1>
+    // <> … </> = un "fragment" : regroupe plusieurs éléments sans ajouter de balise dans la page.
+    <>
+      <UnicornSky />
+      <main className="app">
+        <h1>Liste de courses</h1>
 
-      {status === 'loading' && <p>Chargement…</p>}
+        {status === 'loading' && <p>Chargement…</p>}
 
-      {status === 'error' && (
-        <p className="error" role="alert">
-          Impossible de charger le catalogue. Vérifie ta connexion puis recharge la page.
-        </p>
-      )}
+        {status === 'error' && (
+          <p className="error" role="alert">
+            Impossible de charger le catalogue. Vérifie ta connexion puis recharge la page.
+          </p>
+        )}
 
-      {status === 'ready' && (
-        <>
-          <form className="add-form" onSubmit={handleAdd}>
-            <label htmlFor="product">Produit</label>
-            <select
-              id="product"
-              value={selectedId}
-              onChange={(event) => setSelectedId(event.target.value)}
-            >
-              <option value="">— Choisir un produit —</option>
-              {catalog.map((product) => (
-                <option key={product.id} value={product.id}>
-                  {product.title}
-                </option>
-              ))}
-            </select>
-            <button type="submit" disabled={busy}>
-              Ajouter
-            </button>
-          </form>
+        {status === 'ready' && (
+          <>
+            <form className="add-form" onSubmit={handleAdd}>
+              <label htmlFor="product">Produit</label>
+              <select
+                id="product"
+                value={selectedId}
+                onChange={(event) => setSelectedId(event.target.value)}
+              >
+                <option value="">— Choisir un produit —</option>
+                {catalog.map((product) => (
+                  <option key={product.id} value={product.id}>
+                    {product.title}
+                  </option>
+                ))}
+              </select>
+              <button type="submit" disabled={busy}>
+                Ajouter
+              </button>
+            </form>
 
-          {error && (
-            <p className="error" role="alert">
-              {error}
-            </p>
-          )}
+            {error && (
+              <p className="error" role="alert">
+                {error}
+              </p>
+            )}
 
-          {list.length === 0 ? (
-            <p className="empty">La liste est vide</p>
-          ) : (
-            <ul className="list" aria-label="Ma liste">
-              {list.map((item) => (
-                // key : React a besoin d'un identifiant unique par ligne (R11 : id du catalogue).
-                <li key={item.id}>
-                  <span>
-                    {item.title} × {item.quantity}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(item)}
-                    disabled={busy}
-                    aria-label={`Supprimer ${item.title}`}
-                  >
-                    Supprimer
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
-      )}
-    </main>
+            {list.length === 0 ? (
+              <p className="empty">La liste est vide</p>
+            ) : (
+              <ul className="list" aria-label="Ma liste">
+                {list.map((item) => (
+                  // key : React a besoin d'un identifiant unique par ligne (R11 : id du catalogue).
+                  <li key={item.id}>
+                    <span>
+                      {item.title} × {item.quantity}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(item)}
+                      disabled={busy}
+                      aria-label={`Supprimer ${item.title}`}
+                    >
+                      Supprimer
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+      </main>
+      {/* R27 / R28 : les licornes au caddie, devant le contenu. aria-hidden : décoratif. */}
+      <div className="cart-rides" aria-hidden="true">
+        {rides.map((ride) => (
+          <CartUnicorn key={ride.key} ride={ride} />
+        ))}
+      </div>
+    </>
   )
 }
 

@@ -7,13 +7,20 @@ Déployée sur **Red Hat OpenShift** (Developer Sandbox) : https://liste-de-cour
 - On choisit un produit dans le catalogue (catégorie *groceries* de DummyJSON) et on l'ajoute.
 - Ajouter un produit déjà présent augmente sa quantité de 1.
 - On peut supprimer une ligne de la liste.
+- Des licornes ailées volent en fond ; à chaque ajout ou suppression réussi, une licorne hennit et
+  traverse l'écran en poussant un caddie avec le nom du produit (barré pour une suppression).
 
-Les règles exactes sont dans [`SPEC.md`](SPEC.md) (R1 à R24).
+Les règles exactes sont dans [`SPEC.md`](SPEC.md) (R1 à R31).
 
 ## Limites (voulues)
 
 DummyJSON **simule** les ajouts et les suppressions : rien n'est enregistré sur le serveur.
 La liste vit dans la mémoire de React et redevient vide quand on recharge la page.
+
+## Crédits
+
+- Hennissement : [« Wiehern.ogg »](https://commons.wikimedia.org/wiki/File:Wiehern.ogg) par Hü,
+  Wikimedia Commons, **domaine public**.
 
 ## Lancer en local
 
@@ -32,6 +39,11 @@ npm run build      # construit le site dans dist/
 | `src/list.ts` | Les règles de la liste (ajouter / quantité / supprimer), en fonctions pures |
 | `src/App.tsx` | L'interface : menu du catalogue, liste, messages |
 | `src/types.ts` | Les types `Product` et `ListItem` |
+| `src/Unicorn.tsx` | Le dessin SVG de la licorne, réutilisé partout |
+| `src/UnicornSky.tsx` | Les 6 licornes qui volent en fond |
+| `src/CartUnicorn.tsx` | La licorne qui pousse un caddie après un ajout / une suppression |
+| `src/unicorns.css` | Les animations des licornes (et leur arrêt si « moins d'animations ») |
+| `src/sound.ts` | Joue le hennissement |
 | `*.test.ts(x)`, `tests/` | Les tests |
 | `Dockerfile` | Image du conteneur : build Node puis nginx non-root sur le port 8080 |
 

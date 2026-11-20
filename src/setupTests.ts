@@ -1,10 +1,19 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
-import { afterEach, vi } from 'vitest'
+import { afterEach, beforeEach, vi } from 'vitest'
 
-// Après chaque test : on enlève ce qui a été affiché et on remet les faux fetch à zéro.
+// Avant chaque test : jsdom (le faux navigateur) ne sait pas jouer de son.
+// On remplace donc audio.play() par un faux qui "réussit" tout de suite,
+// et qui permet aux tests de compter les hennissements (R27 à R30).
+beforeEach(() => {
+  vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined)
+})
+
+// Après chaque test : on enlève ce qui a été affiché, on remet les faux à zéro
+// et on revient aux vrais minuteurs (certains tests les accélèrent).
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
+  vi.useRealTimers()
 })

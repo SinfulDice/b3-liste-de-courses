@@ -75,6 +75,26 @@ toujours `id: 195`, et les champs inconnus (comme `quantity`) sont ignorés.
 - **R24** : l'app est construite (`npm run build`) puis servie par un serveur web dans un conteneur
   compatible OpenShift (pas de root, port 8080), et déployée sur le Developer Sandbox.
 
+## v1.1 — Licornes (ajouté le 2026-11-20)
+
+- **R25** : en fond d'écran, **6 licornes ailées dessinées en SVG** traversent l'écran de gauche à droite
+  en ondulant, en boucle, à des hauteurs, tailles et vitesses différentes. Elles sont **derrière** le contenu,
+  ne bloquent jamais les clics, sont ignorées par les lecteurs d'écran (décoratives) et ne créent pas
+  de barre de défilement horizontale.
+- **R26** : si le système demande « moins d'animations » (`prefers-reduced-motion: reduce`), les licornes
+  du fond restent **visibles mais immobiles**.
+- **R27** : après un **ajout réussi** (nouveau produit ou quantité + 1), on entend un **hennissement** et une
+  **licorne poussant un caddie** traverse l'écran de gauche à droite ; le caddie porte le nom du produit.
+- **R28** : après une **suppression réussie**, même hennissement et même licorne au caddie, mais le nom du
+  produit sur le caddie est **barré** (elle emporte le produit).
+- **R29** : si l'ajout ou la suppression **échoue**, pas de hennissement ni de licorne au caddie.
+- **R30** : le son est le fichier `public/sounds/neigh.ogg` (« Wiehern.ogg », Wikimedia Commons,
+  **domaine public**). Si le navigateur ne peut pas le jouer, rien ne casse et aucune erreur n'est affichée.
+  Pas de bouton pour couper le son.
+- **R31** : chaque licorne au caddie disparaît après **4 secondes**. Plusieurs actions rapides = plusieurs
+  licornes au caddie en même temps. Elles passent devant le contenu mais ne bloquent pas les clics.
+  Avec « moins d'animations », elle apparaît immobile puis disparaît après 4 secondes (le son est joué).
+
 ## Plus tard (pas en v1)
 
 - Diminuer la quantité de 1 (bouton « − »).
