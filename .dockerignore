@@ -1,0 +1,5 @@
+# Fichiers à NE PAS envoyer dans l'image (inutiles ou recréés pendant le build).
+node_modules
+dist
+.git
+*.log
